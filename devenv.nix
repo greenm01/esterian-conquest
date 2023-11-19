@@ -5,13 +5,18 @@
   env.GREET = "devenv";
 
   # https://devenv.sh/packages/
-  packages = [ pkgs.git ];
+  packages with pkgs; [
+    git 
+    rustc
+    cargo
+    gcc
+  ];
 
   # https://devenv.sh/scripts/
   scripts.hello.exec = "echo hello from $GREET";
 
   enterShell = ''
-    hello
+    Welome, keyboard commander!
     git --version
   '';
 
