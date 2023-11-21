@@ -10,10 +10,14 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Create a new game at specified directory
+    /// Create a new game at specified path 
     New { path: Option<String> },
-    /// Run a game at specified game directory
+    /// Run server for game specified at path
     Run { path: Option<String> },
+    /// Manually run turn maintenance for game at path [TODO]
+    Maint { path: Option<String> },
+    /// Display statistics for game at path [TODO]
+    Stats { path: Option<String> },
 }
 
 fn main() {
@@ -23,10 +27,20 @@ fn main() {
     // matches just as you would the top level cmd
     match &cli.command {
         Commands::New { path } => {
-            println!("New game created at {path:?}")
+            let p = path.as_ref().unwrap();
+            println!("New game created at {p:?}")
         }
         Commands::Run { path } => {
-            println!("Running game at {path:?}")
+            let p = path.as_ref().unwrap();
+            println!("Running game at {p:?}")
+        }
+        Commands::Maint { path } => {
+            let p = path.as_ref().unwrap();
+            println!("[TODO]: manually run maintenance for game located at {p:?}")    
+        }
+        Commands::Stats { path } => {
+            let p = path.as_ref().unwrap();
+            println!("[TODO]: Show game stats for game located at {p:?}")
         }
     }
 }
