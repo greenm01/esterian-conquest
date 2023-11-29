@@ -7,8 +7,7 @@
   # https://devenv.sh/packages/
   packages = with pkgs; [
     git 
-    rustc
-    cargo
+    odin
     gcc
   ];
 
