@@ -1,1 +1,520 @@
-{"payload":{"allShortcutsEnabled":false,"fileTree":{"":{"items":[{"name":"LICENSE.md","path":"LICENSE.md","contentType":"file"},{"name":"README.md","path":"README.md","contentType":"file"},{"name":"cel.odin","path":"cel.odin","contentType":"file"},{"name":"example.odin","path":"example.odin","contentType":"file"},{"name":"token.odin","path":"token.odin","contentType":"file"}],"totalCount":5}},"fileTreeProcessingTime":4.309796,"foldersToFetch":[],"reducedMotionEnabled":null,"repo":{"id":112118207,"defaultBranch":"master","name":"CEL","ownerLogin":"odin-lang","currentUserCanPush":false,"isFork":false,"isEmpty":false,"createdAt":"2017-11-26T21:30:21.000Z","ownerAvatar":"https://avatars.githubusercontent.com/u/34303136?v=4","public":true,"private":false,"isOrgOwned":true},"symbolsExpanded":false,"treeExpanded":true,"refInfo":{"name":"master","listCacheKey":"v0:1533199181.0","canEdit":false,"refType":"branch","currentOid":"ea6d80d1f5250371af2aecae92cd984ef01b3d05"},"path":"token.odin","currentUser":null,"blob":{"rawLines":["package cel;","","import \"core:fmt\";","import \"core:unicode/utf8\";","","Kind :: enum #export {","\tIllegal,","\tEOF,","\tComment,","","\t_literal_start,","\t\tIdent,","\t\tInteger,","\t\tFloat,","\t\tChar,","\t\tString,","\t_literal_end,","","\t_keyword_start,","\t\tTrue,  // true","\t\tFalse, // false","\t\tNil,   // nil","\t_keyword_end,","","","\t_operator_start,","\t\tQuestion, // ?","","\t\tAnd,   // and","\t\tOr,    // or","","\t\tAdd,   // +","\t\tSub,   // -","\t\tMul,   // *","\t\tQuo,   // /","\t\tRem,   // %","","\t\tNot,   // !","","\t\tEq,    // ==","\t\tNotEq, // !=","\t\tLt,    // <","\t\tGt,    // >","\t\tLtEq,  // <=","\t\tGtEq,  // >=","","\t\tAt,    // @","\t_operator_end,","","\t_punc_start,","\t\tAssign, // =","","\t\tOpen_Paren,    // (","\t\tClose_Paren,   // )","\t\tOpen_Bracket,  // [","\t\tClose_Bracket, // ]","\t\tOpen_Brace,    // {","\t\tClose_Brace,   // }","","\t\tColon,     // :","\t\tSemicolon, // ;","\t\tComma,     // ,","\t\tPeriod,    // .","\t_punc_end,","}","","","Pos :: struct {","\tfile:   string,","\tline:   int,","\tcolumn: int,","}","","Token :: struct {","\tkind:      Kind,","\tusing pos: Pos,","\tlit:       string,","}","","Tokenizer :: struct {","\tsrc: []byte,","","\tfile:        string, // May not be used","","\tcurr_rune:   rune,","\toffset:      int,","\tread_offset: int,","\tline_offset: int,","\tline_count:  int,","","\tinsert_semi: bool,","","\terror_count: int,","}","","","keywords := map[string]Kind{","\t\"true\"  = True,","\t\"false\" = False,","\t\"nil\"   = Nil,","\t\"and\"   = And,","\t\"or\"    = Or,","};","","kind_to_string := [Kind.count]string{","\t\"illegal\",","\t\"EOF\",","\t\"comment\",","","\t\"\",","\t\"identifier\",","\t\"integer\",","\t\"float\",","\t\"character\",","\t\"string\",","\t\"\",","","\t\"\",","\t\"true\", \"false\", \"nil\",","\t\"\",","","\t\"\",","\t\"?\", \"and\", \"or\",","\t\"+\", \"-\", \"*\", \"/\", \"%\",","\t\"!\",","\t\"==\", \"!=\", \"<\", \">\", \"<=\", \">=\",","\t\"@\",","\t\"\",","","\t\"\",","\t\"=\",","\t\"(\", \")\",","\t\"[\", \"]\",","\t\"{\", \"}\",","\t\":\", \";\", \",\", \".\",","\t\"\",","};","","precedence :: proc(op: Kind) -> int {","\tswitch op {","\tcase Question:","\t\treturn 1;","\tcase Or:","\t\treturn 2;","\tcase And:","\t\treturn 3;","\tcase Eq, NotEq, Lt, Gt, LtEq, GtEq:","\t\treturn 4;","\tcase Add, Sub:","\t\treturn 5;","\tcase Mul, Quo, Rem:","\t\treturn 6;","\t}","\treturn 0;","}","","","token_lookup :: proc(ident: string) -> Kind {","\tif tok, is_keyword := keywords[ident]; is_keyword {","\t\treturn tok;","\t}","\treturn Ident;","}","","is_literal  :: proc(tok: Kind) -> bool do return _literal_start  < tok && tok < _literal_end;","is_operator :: proc(tok: Kind) -> bool do return _operator_start < tok && tok < _operator_end;","is_keyword  :: proc(tok: Kind) -> bool do return _keyword_start  < tok && tok < _keyword_end;","","","tokenizer_init :: proc(t: ^Tokenizer, src: []byte, file := \"\") {","\tt.src = src;","\tt.file = file;","\tt.curr_rune   = ' ';","\tt.offset      = 0;","\tt.read_offset = 0;","\tt.line_offset = 0;","\tt.line_count  = 1;","","\tadvance_to_next_rune(t);","\tif t.curr_rune == utf8.RUNE_BOM {","\t\tadvance_to_next_rune(t);","\t}","}","","token_error :: proc(t: ^Tokenizer, msg: string, args: ...any) {","\tfmt.printf_err(\"%s(%d:%d) Error: \", t.file, t.line_count, t.read_offset-t.line_offset+1);","\tfmt.printf_err(msg, ...args);","\tfmt.println_err();","\tt.error_count += 1;","}","","advance_to_next_rune :: proc(t: ^Tokenizer) {","\tif t.read_offset < len(t.src) {","\t\tt.offset = t.read_offset;","\t\tif t.curr_rune == '\\n' {","\t\t\tt.line_offset = t.offset;","\t\t\tt.line_count += 1;","\t\t}","\t\tr, w := rune(t.src[t.read_offset]), 1;","\t\tswitch {","\t\tcase r == 0:","\t\t\ttoken_error(t, \"Illegal character NUL\");","\t\tcase r >= utf8.RUNE_SELF:","\t\t\tr, w = utf8.decode_rune(t.src[t.read_offset..]);","\t\t\tif r == utf8.RUNE_ERROR && w == 1 {","\t\t\t\ttoken_error(t, \"Illegal utf-8 encoding\");","\t\t\t} else if r == utf8.RUNE_BOM && t.offset > 0 {","\t\t\t\ttoken_error(t, \"Illegal byte order mark\");","\t\t\t}","\t\t}","","\t\tt.read_offset += w;","\t\tt.curr_rune = r;","\t} else {","\t\tt.offset = len(t.src);","\t\tif t.curr_rune == '\\n' {","\t\t\tt.line_offset = t.offset;","\t\t\tt.line_count += 1;","\t\t}","\t\tt.curr_rune = utf8.RUNE_EOF;","\t}","}","","","get_pos :: proc(t: ^Tokenizer) -> Pos {","\treturn Pos {","\t\tfile   = t.file,","\t\tline   = t.line_count,","\t\tcolumn = t.offset - t.line_offset + 1,","\t};","}","","is_letter :: proc(r: rune) -> bool {","\tswitch r {","\tcase 'a'...'z', 'A'...'Z', '_':","\t\treturn true;","\t}","\treturn false;","}","","is_digit :: proc(r: rune) -> bool {","\tswitch r {","\tcase '0'...'9':","\t\treturn true;","\t}","\treturn false;","}","","skip_whitespace :: proc(t: ^Tokenizer) {","\tloop: for {","\t\tswitch t.curr_rune {","\t\tcase '\\n':","\t\t\tif t.insert_semi {","\t\t\t\tbreak loop;","\t\t\t}","\t\t\tfallthrough;","\t\tcase ' ', '\\t', '\\r', '\\v', '\\f':","\t\t\tadvance_to_next_rune(t);","","\t\tcase:","\t\t\tbreak loop;","\t\t}","\t}","}","","scan_identifier :: proc(t: ^Tokenizer) -> string {","\toffset := t.offset;","\tfor is_letter(t.curr_rune) || is_digit(t.curr_rune) {","\t\tadvance_to_next_rune(t);","\t}","\treturn string(t.src[offset .. t.offset]);","}","","digit_value :: proc(r: rune) -> int {","\tswitch r {","\tcase '0'...'9': return int(r - '0');","\tcase 'a'...'f': return int(r - 'a' + 10);","\tcase 'A'...'F': return int(r - 'A' + 10);","\t}","\treturn 16;","}","","scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {","\tscan_manitissa :: proc(t: ^Tokenizer, base: int) {","\t\tfor digit_value(t.curr_rune) < base || t.curr_rune == '_' {","\t\t\tadvance_to_next_rune(t);","\t\t}","\t}","\tscan_exponent :: proc(t: ^Tokenizer, tok: Kind, offset: int) -> (Kind, string) {","\t\tif t.curr_rune == 'e' || t.curr_rune == 'E' {","\t\t\ttok = Float;","\t\t\tadvance_to_next_rune(t);","\t\t\tif t.curr_rune == '-' || t.curr_rune == '+' {","\t\t\t\tadvance_to_next_rune(t);","\t\t\t}","\t\t\tif digit_value(t.curr_rune) < 10 {","\t\t\t\tscan_manitissa(t, 10);","\t\t\t} else {","\t\t\t\ttoken_error(t, \"Illegal floating point exponent\");","\t\t\t}","\t\t}","\t\treturn tok, string(t.src[offset .. t.offset]);","\t}","\tscan_fraction :: proc(t: ^Tokenizer, tok: Kind, offset: int) -> (Kind, string) {","\t\tif t.curr_rune == '.' {","\t\t\ttok = Float;","\t\t\tadvance_to_next_rune(t);","\t\t\tscan_manitissa(t, 10);","\t\t}","","\t\treturn scan_exponent(t, tok, offset);","\t}","","\toffset := t.offset;","\ttok := Integer;","","\tif seen_decimal_point {","\t\toffset -= 1;","\t\ttok = Float;","\t\tscan_manitissa(t, 10);","\t\treturn scan_exponent(t, tok, offset);","\t}","","\tif t.curr_rune == '0' {","\t\toffset := t.offset;","\t\tadvance_to_next_rune(t);","\t\tswitch t.curr_rune {","\t\tcase 'b', 'B':","\t\t\tadvance_to_next_rune(t);","\t\t\tscan_manitissa(t, 2);","\t\t\tif t.offset - offset <= 2 {","\t\t\t\ttoken_error(t, \"Illegal binary number\");","\t\t\t}","\t\tcase 'o', 'O':","\t\t\tadvance_to_next_rune(t);","\t\t\tscan_manitissa(t, 8);","\t\t\tif t.offset - offset <= 2 {","\t\t\t\ttoken_error(t, \"Illegal octal number\");","\t\t\t}","\t\tcase 'x', 'X':","\t\t\tadvance_to_next_rune(t);","\t\t\tscan_manitissa(t, 16);","\t\t\tif t.offset - offset <= 2 {","\t\t\t\ttoken_error(t, \"Illegal hexadecimal number\");","\t\t\t}","\t\tcase:","\t\t\tscan_manitissa(t, 10);","\t\t\tswitch t.curr_rune {","\t\t\tcase '.', 'e', 'E':","\t\t\t\treturn scan_fraction(t, tok, offset);","\t\t\t}","\t\t}","","\t\treturn tok, string(t.src[offset .. t.offset]);","\t}","","\tscan_manitissa(t, 10);","","\treturn scan_fraction(t, tok, offset);","}","","scan :: proc(t: ^Tokenizer) -> Token {","\tskip_whitespace(t);","","\toffset := t.offset;","","\ttok: Kind;","\tpos := get_pos(t);","\tlit: string;","","\tinsert_semi := false;","","","\tswitch r := t.curr_rune; {","\tcase is_letter(r):","\t\tinsert_semi = true;","\t\tlit = scan_identifier(t);","\t\ttok = Ident;","\t\tif len(lit) > 1 {","\t\t\ttok = token_lookup(lit);","\t\t}","","\tcase '0' <= r && r <= '9':","\t\tinsert_semi = true;","\t\ttok, lit = scan_number(t, false);","","\tcase:","\t\tadvance_to_next_rune(t);","\t\tswitch r {","\t\tcase -1:","\t\t\tif t.insert_semi {","\t\t\t\tt.insert_semi = false;","\t\t\t\treturn Token{Semicolon, pos, \"\\n\"};","\t\t\t}","\t\t\treturn Token{EOF, pos, \"\\n\"};","","\t\tcase '\\n':","\t\t\tt.insert_semi = false;","\t\t\treturn Token{Semicolon, pos, \"\\n\"};","","\t\tcase '\"':","\t\t\tinsert_semi = true;","\t\t\tquote := r;","\t\t\ttok = String;","\t\t\tfor {","\t\t\t\tr := t.curr_rune;","\t\t\t\tif r == '\\n' || r < 0 {","\t\t\t\t\ttoken_error(t, \"String literal not terminated\");","\t\t\t\t\tbreak;","\t\t\t\t}","\t\t\t\tadvance_to_next_rune(t);","\t\t\t\tif r == quote {","\t\t\t\t\tbreak;","\t\t\t\t}","\t\t\t\t// TODO(bill); Handle properly","\t\t\t\tif r == '\\\\' && t.curr_rune == quote {","\t\t\t\t\tadvance_to_next_rune(t);","\t\t\t\t}","\t\t\t}","","\t\t\tlit = string(t.src[offset+1..t.offset-1]);","","","\t\tcase '#':","\t\t\tfor t.curr_rune != '\\n' && t.curr_rune >= 0 {","\t\t\t\tadvance_to_next_rune(t);","\t\t\t}","\t\t\tif t.insert_semi {","\t\t\t\tt.insert_semi = false;","\t\t\t\treturn Token{Semicolon, pos, \"\\n\"};","\t\t\t}","\t\t\t// Recursive!","\t\t\treturn scan(t);","","\t\tcase '?': tok = Question;","\t\tcase ':': tok = Colon;","\t\tcase '@': tok = At;","","\t\tcase ';':","\t\t\ttok = Semicolon;","\t\t\tlit = \";\";","\t\tcase ',': tok = Comma;","","\t\tcase '(':","\t\t\ttok = Open_Paren;","\t\tcase ')':","\t\t\tinsert_semi = true;","\t\t\ttok = Close_Paren;","","\t\tcase '[':","\t\t\ttok = Open_Bracket;","\t\tcase ']':","\t\t\tinsert_semi = true;","\t\t\ttok = Close_Bracket;","","\t\tcase '{':","\t\t\ttok = Open_Brace;","\t\tcase '}':","\t\t\tinsert_semi = true;","\t\t\ttok = Close_Brace;","","\t\tcase '+': tok = Add;","\t\tcase '-': tok = Sub;","\t\tcase '*': tok = Mul;","\t\tcase '/': tok = Quo;","\t\tcase '%': tok = Rem;","","\t\tcase '!':","\t\t\ttok = Not;","\t\t\tif t.curr_rune == '=' {","\t\t\t\tadvance_to_next_rune(t);","\t\t\t\ttok = NotEq;","\t\t\t}","","\t\tcase '=':","\t\t\ttok = Assign;","\t\t\tif t.curr_rune == '=' {","\t\t\t\tadvance_to_next_rune(t);","\t\t\t\ttok = Eq;","\t\t\t}","","\t\tcase '<':","\t\t\ttok = Lt;","\t\t\tif t.curr_rune == '=' {","\t\t\t\tadvance_to_next_rune(t);","\t\t\t\ttok = LtEq;","\t\t\t}","","\t\tcase '>':","\t\t\ttok = Gt;","\t\t\tif t.curr_rune == '=' {","\t\t\t\tadvance_to_next_rune(t);","\t\t\t\ttok = GtEq;","\t\t\t}","","\t\tcase '.':","\t\t\tif '0' <= t.curr_rune && t.curr_rune <= '9' {","\t\t\t\tinsert_semi = true;","\t\t\t\ttok, lit = scan_number(t, true);","\t\t\t} else {","\t\t\t\ttok = Period;","\t\t\t}","","\t\tcase:","\t\t\tif r != utf8.RUNE_BOM {","\t\t\t\ttoken_error(t, \"Illegal character '%r'\", r);","\t\t\t}","\t\t\tinsert_semi = t.insert_semi;","\t\t\ttok = Illegal;","\t\t}","\t}","","\tt.insert_semi = insert_semi;","","\tif lit == \"\" {","\t\tlit = string(t.src[offset .. t.offset]);","\t}","","\treturn Token{tok, pos, lit};","}"],"stylingDirectives":[[{"start":0,"end":7,"cssClass":"pl-k"}],[],[{"start":0,"end":6,"cssClass":"pl-k"},{"start":7,"end":17,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":16,"end":17,"cssClass":"pl-pds"}],[{"start":0,"end":6,"cssClass":"pl-k"},{"start":7,"end":26,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":25,"end":26,"cssClass":"pl-pds"}],[],[{"start":8,"end":12,"cssClass":"pl-k"},{"start":13,"end":20,"cssClass":"pl-k"}],[],[],[],[],[],[],[],[],[],[],[],[],[],[{"start":9,"end":16,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":17,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":15,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[],[],[],[],[{"start":12,"end":16,"cssClass":"pl-c"},{"start":12,"end":14,"cssClass":"pl-c"}],[],[{"start":9,"end":15,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":14,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[],[{"start":9,"end":14,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":14,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":14,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[{"start":9,"end":14,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[],[{"start":9,"end":13,"cssClass":"pl-c"},{"start":9,"end":11,"cssClass":"pl-c"}],[],[],[],[{"start":10,"end":14,"cssClass":"pl-c"},{"start":10,"end":12,"cssClass":"pl-c"}],[],[{"start":17,"end":21,"cssClass":"pl-c"},{"start":17,"end":19,"cssClass":"pl-c"}],[{"start":17,"end":21,"cssClass":"pl-c"},{"start":17,"end":19,"cssClass":"pl-c"}],[{"start":17,"end":21,"cssClass":"pl-c"},{"start":17,"end":19,"cssClass":"pl-c"}],[{"start":17,"end":21,"cssClass":"pl-c"},{"start":17,"end":19,"cssClass":"pl-c"}],[{"start":17,"end":21,"cssClass":"pl-c"},{"start":17,"end":19,"cssClass":"pl-c"}],[{"start":17,"end":21,"cssClass":"pl-c"},{"start":17,"end":19,"cssClass":"pl-c"}],[],[{"start":13,"end":17,"cssClass":"pl-c"},{"start":13,"end":15,"cssClass":"pl-c"}],[{"start":13,"end":17,"cssClass":"pl-c"},{"start":13,"end":15,"cssClass":"pl-c"}],[{"start":13,"end":17,"cssClass":"pl-c"},{"start":13,"end":15,"cssClass":"pl-c"}],[{"start":13,"end":17,"cssClass":"pl-c"},{"start":13,"end":15,"cssClass":"pl-c"}],[],[],[],[],[{"start":7,"end":13,"cssClass":"pl-k"}],[{"start":9,"end":15,"cssClass":"pl-k"}],[{"start":9,"end":12,"cssClass":"pl-k"}],[{"start":9,"end":12,"cssClass":"pl-k"}],[],[],[{"start":9,"end":15,"cssClass":"pl-k"}],[],[{"start":1,"end":6,"cssClass":"pl-k"}],[{"start":12,"end":18,"cssClass":"pl-k"}],[],[],[{"start":13,"end":19,"cssClass":"pl-k"}],[{"start":8,"end":12,"cssClass":"pl-k"}],[],[{"start":14,"end":20,"cssClass":"pl-k"},{"start":22,"end":40,"cssClass":"pl-c"},{"start":22,"end":24,"cssClass":"pl-c"}],[],[{"start":14,"end":18,"cssClass":"pl-k"}],[{"start":14,"end":17,"cssClass":"pl-k"}],[{"start":14,"end":17,"cssClass":"pl-k"}],[{"start":14,"end":17,"cssClass":"pl-k"}],[{"start":14,"end":17,"cssClass":"pl-k"}],[],[{"start":14,"end":18,"cssClass":"pl-k"}],[],[{"start":14,"end":17,"cssClass":"pl-k"}],[],[],[],[{"start":12,"end":15,"cssClass":"pl-k"},{"start":16,"end":22,"cssClass":"pl-k"}],[{"start":1,"end":7,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":6,"end":7,"cssClass":"pl-pds"}],[{"start":1,"end":8,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":7,"end":8,"cssClass":"pl-pds"}],[{"start":1,"end":6,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":5,"end":6,"cssClass":"pl-pds"}],[{"start":1,"end":6,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":5,"end":6,"cssClass":"pl-pds"}],[{"start":1,"end":5,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":4,"end":5,"cssClass":"pl-pds"}],[],[],[{"start":30,"end":36,"cssClass":"pl-k"}],[{"start":1,"end":10,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":1,"end":6,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":5,"end":6,"cssClass":"pl-pds"}],[{"start":1,"end":10,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":1,"end":3,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":2,"end":3,"cssClass":"pl-pds"}],[{"start":1,"end":13,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":12,"end":13,"cssClass":"pl-pds"}],[{"start":1,"end":10,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":1,"end":8,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":7,"end":8,"cssClass":"pl-pds"}],[{"start":1,"end":12,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":11,"end":12,"cssClass":"pl-pds"}],[{"start":1,"end":9,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"}],[{"start":1,"end":3,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":2,"end":3,"cssClass":"pl-pds"}],[],[{"start":1,"end":3,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":2,"end":3,"cssClass":"pl-pds"}],[{"start":1,"end":7,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":9,"end":16,"cssClass":"pl-s"},{"start":9,"end":10,"cssClass":"pl-pds"},{"start":15,"end":16,"cssClass":"pl-pds"},{"start":18,"end":23,"cssClass":"pl-s"},{"start":18,"end":19,"cssClass":"pl-pds"},{"start":22,"end":23,"cssClass":"pl-pds"}],[{"start":1,"end":3,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":2,"end":3,"cssClass":"pl-pds"}],[],[{"start":1,"end":3,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":2,"end":3,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"},{"start":6,"end":11,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":10,"end":11,"cssClass":"pl-pds"},{"start":13,"end":17,"cssClass":"pl-s"},{"start":13,"end":14,"cssClass":"pl-pds"},{"start":16,"end":17,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":11,"end":14,"cssClass":"pl-s"},{"start":11,"end":12,"cssClass":"pl-pds"},{"start":13,"end":14,"cssClass":"pl-pds"},{"start":16,"end":19,"cssClass":"pl-s"},{"start":16,"end":17,"cssClass":"pl-pds"},{"start":18,"end":19,"cssClass":"pl-pds"},{"start":21,"end":24,"cssClass":"pl-s"},{"start":21,"end":22,"cssClass":"pl-pds"},{"start":23,"end":24,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"}],[{"start":1,"end":5,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":4,"end":5,"cssClass":"pl-pds"},{"start":7,"end":11,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":10,"end":11,"cssClass":"pl-pds"},{"start":13,"end":16,"cssClass":"pl-s"},{"start":13,"end":14,"cssClass":"pl-pds"},{"start":15,"end":16,"cssClass":"pl-pds"},{"start":18,"end":21,"cssClass":"pl-s"},{"start":18,"end":19,"cssClass":"pl-pds"},{"start":20,"end":21,"cssClass":"pl-pds"},{"start":23,"end":27,"cssClass":"pl-s"},{"start":23,"end":24,"cssClass":"pl-pds"},{"start":26,"end":27,"cssClass":"pl-pds"},{"start":29,"end":33,"cssClass":"pl-s"},{"start":29,"end":30,"cssClass":"pl-pds"},{"start":32,"end":33,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"}],[{"start":1,"end":3,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":2,"end":3,"cssClass":"pl-pds"}],[],[{"start":1,"end":3,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":2,"end":3,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"}],[{"start":1,"end":4,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":3,"end":4,"cssClass":"pl-pds"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":11,"end":14,"cssClass":"pl-s"},{"start":11,"end":12,"cssClass":"pl-pds"},{"start":13,"end":14,"cssClass":"pl-pds"},{"start":16,"end":19,"cssClass":"pl-s"},{"start":16,"end":17,"cssClass":"pl-pds"},{"start":18,"end":19,"cssClass":"pl-pds"}],[{"start":1,"end":3,"cssClass":"pl-s"},{"start":1,"end":2,"cssClass":"pl-pds"},{"start":2,"end":3,"cssClass":"pl-pds"}],[],[],[{"start":14,"end":18,"cssClass":"pl-k"},{"start":32,"end":35,"cssClass":"pl-k"}],[{"start":1,"end":7,"cssClass":"pl-k"}],[{"start":1,"end":5,"cssClass":"pl-k"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":10,"cssClass":"pl-c1"}],[{"start":1,"end":5,"cssClass":"pl-k"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":10,"cssClass":"pl-c1"}],[{"start":1,"end":5,"cssClass":"pl-k"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":10,"cssClass":"pl-c1"}],[{"start":1,"end":5,"cssClass":"pl-k"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":10,"cssClass":"pl-c1"}],[{"start":1,"end":5,"cssClass":"pl-k"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":10,"cssClass":"pl-c1"}],[{"start":1,"end":5,"cssClass":"pl-k"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":10,"cssClass":"pl-c1"}],[],[{"start":1,"end":7,"cssClass":"pl-k"},{"start":8,"end":9,"cssClass":"pl-c1"}],[],[],[],[{"start":16,"end":20,"cssClass":"pl-k"},{"start":28,"end":34,"cssClass":"pl-k"}],[{"start":1,"end":3,"cssClass":"pl-k"}],[{"start":2,"end":8,"cssClass":"pl-k"}],[],[{"start":1,"end":7,"cssClass":"pl-k"}],[],[],[{"start":15,"end":19,"cssClass":"pl-k"},{"start":34,"end":38,"cssClass":"pl-k"},{"start":39,"end":41,"cssClass":"pl-k"},{"start":42,"end":48,"cssClass":"pl-k"}],[{"start":15,"end":19,"cssClass":"pl-k"},{"start":34,"end":38,"cssClass":"pl-k"},{"start":39,"end":41,"cssClass":"pl-k"},{"start":42,"end":48,"cssClass":"pl-k"}],[{"start":15,"end":19,"cssClass":"pl-k"},{"start":34,"end":38,"cssClass":"pl-k"},{"start":39,"end":41,"cssClass":"pl-k"},{"start":42,"end":48,"cssClass":"pl-k"}],[],[],[{"start":18,"end":22,"cssClass":"pl-k"},{"start":45,"end":49,"cssClass":"pl-k"},{"start":59,"end":61,"cssClass":"pl-s"},{"start":59,"end":60,"cssClass":"pl-pds"},{"start":60,"end":61,"cssClass":"pl-pds"}],[],[],[{"start":17,"end":20,"cssClass":"pl-s"},{"start":17,"end":18,"cssClass":"pl-pds"},{"start":19,"end":20,"cssClass":"pl-pds"}],[{"start":17,"end":18,"cssClass":"pl-c1"}],[{"start":17,"end":18,"cssClass":"pl-c1"}],[{"start":17,"end":18,"cssClass":"pl-c1"}],[{"start":17,"end":18,"cssClass":"pl-c1"}],[],[{"start":1,"end":21,"cssClass":"pl-c1"}],[{"start":1,"end":3,"cssClass":"pl-k"}],[{"start":2,"end":22,"cssClass":"pl-c1"}],[],[],[],[{"start":15,"end":19,"cssClass":"pl-k"},{"start":40,"end":46,"cssClass":"pl-k"},{"start":57,"end":60,"cssClass":"pl-k"}],[{"start":5,"end":15,"cssClass":"pl-c1"},{"start":16,"end":35,"cssClass":"pl-s"},{"start":16,"end":17,"cssClass":"pl-pds"},{"start":34,"end":35,"cssClass":"pl-pds"},{"start":87,"end":88,"cssClass":"pl-c1"}],[{"start":5,"end":15,"cssClass":"pl-c1"}],[{"start":5,"end":16,"cssClass":"pl-c1"}],[{"start":18,"end":19,"cssClass":"pl-c1"}],[],[],[{"start":24,"end":28,"cssClass":"pl-k"}],[{"start":1,"end":3,"cssClass":"pl-k"},{"start":20,"end":23,"cssClass":"pl-c1"}],[],[{"start":2,"end":4,"cssClass":"pl-k"},{"start":20,"end":24,"cssClass":"pl-s"},{"start":20,"end":21,"cssClass":"pl-pds"},{"start":21,"end":23,"cssClass":"pl-cce"},{"start":23,"end":24,"cssClass":"pl-pds"}],[],[{"start":19,"end":20,"cssClass":"pl-c1"}],[],[{"start":10,"end":14,"cssClass":"pl-k"},{"start":38,"end":39,"cssClass":"pl-c1"}],[{"start":2,"end":8,"cssClass":"pl-k"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":12,"end":13,"cssClass":"pl-c1"}],[{"start":3,"end":14,"cssClass":"pl-c1"},{"start":18,"end":41,"cssClass":"pl-s"},{"start":18,"end":19,"cssClass":"pl-pds"},{"start":40,"end":41,"cssClass":"pl-pds"}],[{"start":2,"end":6,"cssClass":"pl-k"}],[{"start":15,"end":26,"cssClass":"pl-c1"}],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":35,"end":36,"cssClass":"pl-c1"}],[{"start":4,"end":15,"cssClass":"pl-c1"},{"start":19,"end":43,"cssClass":"pl-s"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":42,"end":43,"cssClass":"pl-pds"}],[{"start":5,"end":9,"cssClass":"pl-k"},{"start":10,"end":12,"cssClass":"pl-k"},{"start":46,"end":47,"cssClass":"pl-c1"}],[{"start":4,"end":15,"cssClass":"pl-c1"},{"start":19,"end":44,"cssClass":"pl-s"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":43,"end":44,"cssClass":"pl-pds"}],[],[],[],[],[],[{"start":3,"end":7,"cssClass":"pl-k"}],[{"start":13,"end":16,"cssClass":"pl-c1"}],[{"start":2,"end":4,"cssClass":"pl-k"},{"start":20,"end":24,"cssClass":"pl-s"},{"start":20,"end":21,"cssClass":"pl-pds"},{"start":21,"end":23,"cssClass":"pl-cce"},{"start":23,"end":24,"cssClass":"pl-pds"}],[],[{"start":19,"end":20,"cssClass":"pl-c1"}],[],[],[],[],[],[],[{"start":11,"end":15,"cssClass":"pl-k"}],[{"start":1,"end":7,"cssClass":"pl-k"}],[],[],[{"start":38,"end":39,"cssClass":"pl-c1"}],[],[],[],[{"start":13,"end":17,"cssClass":"pl-k"},{"start":21,"end":25,"cssClass":"pl-k"},{"start":30,"end":34,"cssClass":"pl-k"}],[{"start":1,"end":7,"cssClass":"pl-k"}],[{"start":1,"end":5,"cssClass":"pl-k"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":12,"end":15,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":14,"end":15,"cssClass":"pl-pds"},{"start":17,"end":20,"cssClass":"pl-s"},{"start":17,"end":18,"cssClass":"pl-pds"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":23,"end":26,"cssClass":"pl-s"},{"start":23,"end":24,"cssClass":"pl-pds"},{"start":25,"end":26,"cssClass":"pl-pds"},{"start":28,"end":31,"cssClass":"pl-s"},{"start":28,"end":29,"cssClass":"pl-pds"},{"start":30,"end":31,"cssClass":"pl-pds"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":13,"cssClass":"pl-c1"}],[],[{"start":1,"end":7,"cssClass":"pl-k"},{"start":8,"end":13,"cssClass":"pl-c1"}],[],[],[{"start":12,"end":16,"cssClass":"pl-k"},{"start":20,"end":24,"cssClass":"pl-k"},{"start":29,"end":33,"cssClass":"pl-k"}],[{"start":1,"end":7,"cssClass":"pl-k"}],[{"start":1,"end":5,"cssClass":"pl-k"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":12,"end":15,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":14,"end":15,"cssClass":"pl-pds"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":13,"cssClass":"pl-c1"}],[],[{"start":1,"end":7,"cssClass":"pl-k"},{"start":8,"end":13,"cssClass":"pl-c1"}],[],[],[{"start":19,"end":23,"cssClass":"pl-k"}],[{"start":7,"end":10,"cssClass":"pl-k"}],[{"start":2,"end":8,"cssClass":"pl-k"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":11,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":8,"end":10,"cssClass":"pl-cce"},{"start":10,"end":11,"cssClass":"pl-pds"}],[{"start":3,"end":5,"cssClass":"pl-k"}],[{"start":4,"end":9,"cssClass":"pl-k"}],[],[{"start":3,"end":14,"cssClass":"pl-k"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"},{"start":12,"end":16,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":13,"end":15,"cssClass":"pl-cce"},{"start":15,"end":16,"cssClass":"pl-pds"},{"start":18,"end":22,"cssClass":"pl-s"},{"start":18,"end":19,"cssClass":"pl-pds"},{"start":19,"end":21,"cssClass":"pl-cce"},{"start":21,"end":22,"cssClass":"pl-pds"},{"start":24,"end":28,"cssClass":"pl-s"},{"start":24,"end":25,"cssClass":"pl-pds"},{"start":25,"end":27,"cssClass":"pl-cce"},{"start":27,"end":28,"cssClass":"pl-pds"},{"start":30,"end":34,"cssClass":"pl-s"},{"start":30,"end":31,"cssClass":"pl-pds"},{"start":31,"end":33,"cssClass":"pl-cce"},{"start":33,"end":34,"cssClass":"pl-pds"}],[{"start":3,"end":23,"cssClass":"pl-c1"}],[],[{"start":2,"end":6,"cssClass":"pl-k"}],[{"start":3,"end":8,"cssClass":"pl-k"}],[],[],[],[],[{"start":19,"end":23,"cssClass":"pl-k"},{"start":42,"end":48,"cssClass":"pl-k"}],[],[{"start":1,"end":4,"cssClass":"pl-k"},{"start":5,"end":14,"cssClass":"pl-c1"},{"start":31,"end":39,"cssClass":"pl-c1"}],[{"start":2,"end":22,"cssClass":"pl-c1"}],[],[{"start":1,"end":7,"cssClass":"pl-k"},{"start":8,"end":14,"cssClass":"pl-k"}],[],[],[{"start":15,"end":19,"cssClass":"pl-k"},{"start":23,"end":27,"cssClass":"pl-k"},{"start":32,"end":35,"cssClass":"pl-k"}],[{"start":1,"end":7,"cssClass":"pl-k"}],[{"start":1,"end":5,"cssClass":"pl-k"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":12,"end":15,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":14,"end":15,"cssClass":"pl-pds"},{"start":17,"end":23,"cssClass":"pl-k"},{"start":24,"end":27,"cssClass":"pl-k"},{"start":32,"end":35,"cssClass":"pl-s"},{"start":32,"end":33,"cssClass":"pl-pds"},{"start":34,"end":35,"cssClass":"pl-pds"}],[{"start":1,"end":5,"cssClass":"pl-k"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":12,"end":15,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":14,"end":15,"cssClass":"pl-pds"},{"start":17,"end":23,"cssClass":"pl-k"},{"start":24,"end":27,"cssClass":"pl-k"},{"start":32,"end":35,"cssClass":"pl-s"},{"start":32,"end":33,"cssClass":"pl-pds"},{"start":34,"end":35,"cssClass":"pl-pds"},{"start":38,"end":40,"cssClass":"pl-c1"}],[{"start":1,"end":5,"cssClass":"pl-k"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":12,"end":15,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":14,"end":15,"cssClass":"pl-pds"},{"start":17,"end":23,"cssClass":"pl-k"},{"start":24,"end":27,"cssClass":"pl-k"},{"start":32,"end":35,"cssClass":"pl-s"},{"start":32,"end":33,"cssClass":"pl-pds"},{"start":34,"end":35,"cssClass":"pl-pds"},{"start":38,"end":40,"cssClass":"pl-c1"}],[],[{"start":1,"end":7,"cssClass":"pl-k"},{"start":8,"end":10,"cssClass":"pl-c1"}],[],[],[{"start":15,"end":19,"cssClass":"pl-k"},{"start":55,"end":59,"cssClass":"pl-k"},{"start":71,"end":77,"cssClass":"pl-k"}],[{"start":19,"end":23,"cssClass":"pl-k"},{"start":45,"end":48,"cssClass":"pl-k"}],[{"start":2,"end":5,"cssClass":"pl-k"},{"start":6,"end":17,"cssClass":"pl-c1"},{"start":56,"end":59,"cssClass":"pl-s"},{"start":56,"end":57,"cssClass":"pl-pds"},{"start":58,"end":59,"cssClass":"pl-pds"}],[{"start":3,"end":23,"cssClass":"pl-c1"}],[],[],[{"start":18,"end":22,"cssClass":"pl-k"},{"start":57,"end":60,"cssClass":"pl-k"},{"start":72,"end":78,"cssClass":"pl-k"}],[{"start":2,"end":4,"cssClass":"pl-k"},{"start":20,"end":23,"cssClass":"pl-s"},{"start":20,"end":21,"cssClass":"pl-pds"},{"start":22,"end":23,"cssClass":"pl-pds"},{"start":42,"end":45,"cssClass":"pl-s"},{"start":42,"end":43,"cssClass":"pl-pds"},{"start":44,"end":45,"cssClass":"pl-pds"}],[],[{"start":3,"end":23,"cssClass":"pl-c1"}],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":21,"end":24,"cssClass":"pl-s"},{"start":21,"end":22,"cssClass":"pl-pds"},{"start":23,"end":24,"cssClass":"pl-pds"},{"start":43,"end":46,"cssClass":"pl-s"},{"start":43,"end":44,"cssClass":"pl-pds"},{"start":45,"end":46,"cssClass":"pl-pds"}],[{"start":4,"end":24,"cssClass":"pl-c1"}],[],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":6,"end":17,"cssClass":"pl-c1"},{"start":33,"end":35,"cssClass":"pl-c1"}],[{"start":4,"end":18,"cssClass":"pl-c1"},{"start":22,"end":24,"cssClass":"pl-c1"}],[{"start":5,"end":9,"cssClass":"pl-k"}],[{"start":4,"end":15,"cssClass":"pl-c1"},{"start":19,"end":52,"cssClass":"pl-s"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":51,"end":52,"cssClass":"pl-pds"}],[],[],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":14,"end":20,"cssClass":"pl-k"}],[],[{"start":18,"end":22,"cssClass":"pl-k"},{"start":57,"end":60,"cssClass":"pl-k"},{"start":72,"end":78,"cssClass":"pl-k"}],[{"start":2,"end":4,"cssClass":"pl-k"},{"start":20,"end":23,"cssClass":"pl-s"},{"start":20,"end":21,"cssClass":"pl-pds"},{"start":22,"end":23,"cssClass":"pl-pds"}],[],[{"start":3,"end":23,"cssClass":"pl-c1"}],[{"start":3,"end":17,"cssClass":"pl-c1"},{"start":21,"end":23,"cssClass":"pl-c1"}],[],[],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":22,"cssClass":"pl-c1"}],[],[],[],[],[],[{"start":1,"end":3,"cssClass":"pl-k"}],[{"start":12,"end":13,"cssClass":"pl-c1"}],[],[{"start":2,"end":16,"cssClass":"pl-c1"},{"start":20,"end":22,"cssClass":"pl-c1"}],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":9,"end":22,"cssClass":"pl-c1"}],[],[],[{"start":1,"end":3,"cssClass":"pl-k"},{"start":19,"end":22,"cssClass":"pl-s"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":21,"end":22,"cssClass":"pl-pds"}],[],[{"start":2,"end":22,"cssClass":"pl-c1"}],[{"start":2,"end":8,"cssClass":"pl-k"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"},{"start":12,"end":15,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":14,"end":15,"cssClass":"pl-pds"}],[{"start":3,"end":23,"cssClass":"pl-c1"}],[{"start":3,"end":17,"cssClass":"pl-c1"},{"start":21,"end":22,"cssClass":"pl-c1"}],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":27,"end":28,"cssClass":"pl-c1"}],[{"start":4,"end":15,"cssClass":"pl-c1"},{"start":19,"end":42,"cssClass":"pl-s"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":41,"end":42,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"},{"start":12,"end":15,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":14,"end":15,"cssClass":"pl-pds"}],[{"start":3,"end":23,"cssClass":"pl-c1"}],[{"start":3,"end":17,"cssClass":"pl-c1"},{"start":21,"end":22,"cssClass":"pl-c1"}],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":27,"end":28,"cssClass":"pl-c1"}],[{"start":4,"end":15,"cssClass":"pl-c1"},{"start":19,"end":41,"cssClass":"pl-s"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":40,"end":41,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"},{"start":12,"end":15,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":14,"end":15,"cssClass":"pl-pds"}],[{"start":3,"end":23,"cssClass":"pl-c1"}],[{"start":3,"end":17,"cssClass":"pl-c1"},{"start":21,"end":23,"cssClass":"pl-c1"}],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":27,"end":28,"cssClass":"pl-c1"}],[{"start":4,"end":15,"cssClass":"pl-c1"},{"start":19,"end":47,"cssClass":"pl-s"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":46,"end":47,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"}],[{"start":3,"end":17,"cssClass":"pl-c1"},{"start":21,"end":23,"cssClass":"pl-c1"}],[{"start":3,"end":9,"cssClass":"pl-k"}],[{"start":3,"end":7,"cssClass":"pl-k"},{"start":8,"end":11,"cssClass":"pl-s"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":10,"end":11,"cssClass":"pl-pds"},{"start":13,"end":16,"cssClass":"pl-s"},{"start":13,"end":14,"cssClass":"pl-pds"},{"start":15,"end":16,"cssClass":"pl-pds"},{"start":18,"end":21,"cssClass":"pl-s"},{"start":18,"end":19,"cssClass":"pl-pds"},{"start":20,"end":21,"cssClass":"pl-pds"}],[{"start":4,"end":10,"cssClass":"pl-k"},{"start":11,"end":24,"cssClass":"pl-c1"}],[],[],[],[{"start":2,"end":8,"cssClass":"pl-k"},{"start":14,"end":20,"cssClass":"pl-k"}],[],[],[{"start":1,"end":15,"cssClass":"pl-c1"},{"start":19,"end":21,"cssClass":"pl-c1"}],[],[{"start":1,"end":7,"cssClass":"pl-k"},{"start":8,"end":21,"cssClass":"pl-c1"}],[],[],[{"start":8,"end":12,"cssClass":"pl-k"}],[{"start":1,"end":16,"cssClass":"pl-c1"}],[],[],[],[],[{"start":8,"end":15,"cssClass":"pl-c1"}],[{"start":6,"end":12,"cssClass":"pl-k"}],[],[{"start":16,"end":21,"cssClass":"pl-c1"}],[],[],[{"start":1,"end":7,"cssClass":"pl-k"}],[{"start":1,"end":5,"cssClass":"pl-k"},{"start":6,"end":15,"cssClass":"pl-c1"}],[{"start":16,"end":20,"cssClass":"pl-c1"}],[{"start":8,"end":23,"cssClass":"pl-c1"}],[],[{"start":2,"end":4,"cssClass":"pl-k"},{"start":5,"end":8,"cssClass":"pl-c1"},{"start":16,"end":17,"cssClass":"pl-c1"}],[{"start":9,"end":21,"cssClass":"pl-c1"}],[],[],[{"start":1,"end":5,"cssClass":"pl-k"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":23,"end":26,"cssClass":"pl-s"},{"start":23,"end":24,"cssClass":"pl-pds"},{"start":25,"end":26,"cssClass":"pl-pds"}],[{"start":16,"end":20,"cssClass":"pl-c1"}],[{"start":13,"end":24,"cssClass":"pl-c1"},{"start":28,"end":33,"cssClass":"pl-c1"}],[],[{"start":1,"end":5,"cssClass":"pl-k"}],[{"start":2,"end":22,"cssClass":"pl-c1"}],[{"start":2,"end":8,"cssClass":"pl-k"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":8,"end":9,"cssClass":"pl-c1"}],[{"start":3,"end":5,"cssClass":"pl-k"}],[{"start":20,"end":25,"cssClass":"pl-c1"}],[{"start":4,"end":10,"cssClass":"pl-k"},{"start":33,"end":37,"cssClass":"pl-s"},{"start":33,"end":34,"cssClass":"pl-pds"},{"start":34,"end":36,"cssClass":"pl-cce"},{"start":36,"end":37,"cssClass":"pl-pds"}],[],[{"start":3,"end":9,"cssClass":"pl-k"},{"start":26,"end":30,"cssClass":"pl-s"},{"start":26,"end":27,"cssClass":"pl-pds"},{"start":27,"end":29,"cssClass":"pl-cce"},{"start":29,"end":30,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":11,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":8,"end":10,"cssClass":"pl-cce"},{"start":10,"end":11,"cssClass":"pl-pds"}],[{"start":19,"end":24,"cssClass":"pl-c1"}],[{"start":3,"end":9,"cssClass":"pl-k"},{"start":32,"end":36,"cssClass":"pl-s"},{"start":32,"end":33,"cssClass":"pl-pds"},{"start":33,"end":35,"cssClass":"pl-cce"},{"start":35,"end":36,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":17,"end":21,"cssClass":"pl-c1"}],[],[],[{"start":3,"end":6,"cssClass":"pl-k"}],[],[{"start":4,"end":6,"cssClass":"pl-k"},{"start":12,"end":16,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":13,"end":15,"cssClass":"pl-cce"},{"start":15,"end":16,"cssClass":"pl-pds"},{"start":24,"end":25,"cssClass":"pl-c1"}],[{"start":5,"end":16,"cssClass":"pl-c1"},{"start":20,"end":51,"cssClass":"pl-s"},{"start":20,"end":21,"cssClass":"pl-pds"},{"start":50,"end":51,"cssClass":"pl-pds"}],[{"start":5,"end":10,"cssClass":"pl-k"}],[],[{"start":4,"end":24,"cssClass":"pl-c1"}],[{"start":4,"end":6,"cssClass":"pl-k"}],[{"start":5,"end":10,"cssClass":"pl-k"}],[],[{"start":4,"end":34,"cssClass":"pl-c"},{"start":4,"end":6,"cssClass":"pl-c"}],[{"start":4,"end":6,"cssClass":"pl-k"},{"start":12,"end":16,"cssClass":"pl-s"},{"start":12,"end":13,"cssClass":"pl-pds"},{"start":13,"end":15,"cssClass":"pl-cce"},{"start":15,"end":16,"cssClass":"pl-pds"}],[{"start":5,"end":25,"cssClass":"pl-c1"}],[],[],[],[{"start":9,"end":15,"cssClass":"pl-k"},{"start":29,"end":30,"cssClass":"pl-c1"},{"start":41,"end":42,"cssClass":"pl-c1"}],[],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":3,"end":6,"cssClass":"pl-k"},{"start":22,"end":26,"cssClass":"pl-s"},{"start":22,"end":23,"cssClass":"pl-pds"},{"start":23,"end":25,"cssClass":"pl-cce"},{"start":25,"end":26,"cssClass":"pl-pds"},{"start":45,"end":46,"cssClass":"pl-c1"}],[{"start":4,"end":24,"cssClass":"pl-c1"}],[],[{"start":3,"end":5,"cssClass":"pl-k"}],[{"start":20,"end":25,"cssClass":"pl-c1"}],[{"start":4,"end":10,"cssClass":"pl-k"},{"start":33,"end":37,"cssClass":"pl-s"},{"start":33,"end":34,"cssClass":"pl-pds"},{"start":34,"end":36,"cssClass":"pl-cce"},{"start":36,"end":37,"cssClass":"pl-pds"}],[],[{"start":3,"end":16,"cssClass":"pl-c"},{"start":3,"end":5,"cssClass":"pl-c"}],[{"start":3,"end":9,"cssClass":"pl-k"},{"start":10,"end":14,"cssClass":"pl-c1"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":9,"end":12,"cssClass":"pl-s"},{"start":9,"end":10,"cssClass":"pl-pds"},{"start":11,"end":12,"cssClass":"pl-pds"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":17,"end":21,"cssClass":"pl-c1"}],[],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":17,"end":21,"cssClass":"pl-c1"}],[],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":17,"end":21,"cssClass":"pl-c1"}],[],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":21,"end":24,"cssClass":"pl-s"},{"start":21,"end":22,"cssClass":"pl-pds"},{"start":23,"end":24,"cssClass":"pl-pds"}],[{"start":4,"end":24,"cssClass":"pl-c1"}],[],[],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":21,"end":24,"cssClass":"pl-s"},{"start":21,"end":22,"cssClass":"pl-pds"},{"start":23,"end":24,"cssClass":"pl-pds"}],[{"start":4,"end":24,"cssClass":"pl-c1"}],[],[],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":21,"end":24,"cssClass":"pl-s"},{"start":21,"end":22,"cssClass":"pl-pds"},{"start":23,"end":24,"cssClass":"pl-pds"}],[{"start":4,"end":24,"cssClass":"pl-c1"}],[],[],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":21,"end":24,"cssClass":"pl-s"},{"start":21,"end":22,"cssClass":"pl-pds"},{"start":23,"end":24,"cssClass":"pl-pds"}],[{"start":4,"end":24,"cssClass":"pl-c1"}],[],[],[],[{"start":2,"end":6,"cssClass":"pl-k"},{"start":7,"end":10,"cssClass":"pl-s"},{"start":7,"end":8,"cssClass":"pl-pds"},{"start":9,"end":10,"cssClass":"pl-pds"}],[{"start":3,"end":5,"cssClass":"pl-k"},{"start":6,"end":9,"cssClass":"pl-s"},{"start":6,"end":7,"cssClass":"pl-pds"},{"start":8,"end":9,"cssClass":"pl-pds"},{"start":43,"end":46,"cssClass":"pl-s"},{"start":43,"end":44,"cssClass":"pl-pds"},{"start":45,"end":46,"cssClass":"pl-pds"}],[{"start":18,"end":22,"cssClass":"pl-c1"}],[{"start":15,"end":26,"cssClass":"pl-c1"},{"start":30,"end":34,"cssClass":"pl-c1"}],[{"start":5,"end":9,"cssClass":"pl-k"}],[],[],[],[{"start":2,"end":6,"cssClass":"pl-k"}],[{"start":3,"end":5,"cssClass":"pl-k"}],[{"start":4,"end":15,"cssClass":"pl-c1"},{"start":19,"end":43,"cssClass":"pl-s"},{"start":19,"end":20,"cssClass":"pl-pds"},{"start":42,"end":43,"cssClass":"pl-pds"}],[],[],[],[],[],[],[],[],[{"start":1,"end":3,"cssClass":"pl-k"},{"start":11,"end":13,"cssClass":"pl-s"},{"start":11,"end":12,"cssClass":"pl-pds"},{"start":12,"end":13,"cssClass":"pl-pds"}],[{"start":8,"end":14,"cssClass":"pl-k"}],[],[],[{"start":1,"end":7,"cssClass":"pl-k"}],[]],"csv":null,"csvError":null,"dependabotInfo":{"showConfigurationBanner":false,"configFilePath":null,"networkDependabotPath":"/odin-lang/CEL/network/updates","dismissConfigurationNoticePath":"/settings/dismiss-notice/dependabot_configuration_notice","configurationNoticeDismissed":null,"repoAlertsPath":"/odin-lang/CEL/security/dependabot","repoSecurityAndAnalysisPath":"/odin-lang/CEL/settings/security_analysis","repoOwnerIsOrg":true,"currentUserCanAdminRepo":false},"displayName":"token.odin","displayUrl":"https://github.com/odin-lang/CEL/blob/master/token.odin?raw=true","headerInfo":{"blobSize":"8.98 KB","deleteInfo":{"deleteTooltip":"You must be signed in to make or propose changes"},"editInfo":{"editTooltip":"You must be signed in to make or propose changes"},"ghDesktopPath":"https://desktop.github.com","gitLfsPath":null,"onBranch":true,"shortPath":"0a4b9e4","siteNavLoginPath":"/login?return_to=https%3A%2F%2Fgithub.com%2Fodin-lang%2FCEL%2Fblob%2Fmaster%2Ftoken.odin","isCSV":false,"isRichtext":false,"toc":null,"lineInfo":{"truncatedLoc":"520","truncatedSloc":"437"},"mode":"file"},"image":false,"isCodeownersFile":null,"isPlain":false,"isValidLegacyIssueTemplate":false,"issueTemplateHelpUrl":"https://docs.github.com/articles/about-issue-and-pull-request-templates","issueTemplate":null,"discussionTemplate":null,"language":"Odin","languageID":889244082,"large":false,"loggedIn":false,"newDiscussionPath":"/odin-lang/CEL/discussions/new","newIssuePath":"/odin-lang/CEL/issues/new","planSupportInfo":{"repoIsFork":null,"repoOwnedByCurrentUser":null,"requestFullPath":"/odin-lang/CEL/blob/master/token.odin","showFreeOrgGatedFeatureMessage":null,"showPlanSupportBanner":null,"upgradeDataAttributes":null,"upgradePath":null},"publishBannersInfo":{"dismissActionNoticePath":"/settings/dismiss-notice/publish_action_from_dockerfile","dismissStackNoticePath":"/settings/dismiss-notice/publish_stack_from_file","releasePath":"/odin-lang/CEL/releases/new?marketplace=true","showPublishActionBanner":false,"showPublishStackBanner":false},"rawBlobUrl":"https://github.com/odin-lang/CEL/raw/master/token.odin","renderImageOrRaw":false,"richText":null,"renderedFileInfo":null,"shortPath":null,"tabSize":8,"topBannersInfo":{"overridingGlobalFundingFile":false,"globalPreferredFundingPath":null,"repoOwner":"odin-lang","repoName":"CEL","showInvalidCitationWarning":false,"citationHelpUrl":"https://docs.github.com/en/github/creating-cloning-and-archiving-repositories/creating-a-repository-on-github/about-citation-files","showDependabotConfigurationBanner":false,"actionsOnboardingTip":null},"truncated":false,"viewable":true,"workflowRedirectUrl":null,"symbols":{"timedOut":false,"notAnalyzed":true,"symbols":[]}},"copilotInfo":null,"copilotAccessAllowed":false,"csrf_tokens":{"/odin-lang/CEL/branches":{"post":"pnM6E_8NXlklz92CxETtjLAvoC8Wy_AueTezak76SO0frjeSjqKP23wCwNAuk2H5iX-2Vle4Rs_vu6hoMW5RJg"},"/repos/preferences":{"post":"GEKs1kL6WYPGyDTxe1zhTAnz6VQ1NU1rIqqq4Y_ONnPTYlkXFB_Y8EYuvx2RiojmU2zTk0_9cyrLSggsYeFtDg"}}},"title":"CEL/token.odin at master · odin-lang/CEL"}
+package cel;
+
+import "core:fmt";
+import "core:unicode/utf8";
+
+Kind :: enum #export {
+	Illegal,
+	EOF,
+	Comment,
+
+	_literal_start,
+		Ident,
+		Integer,
+		Float,
+		Char,
+		String,
+	_literal_end,
+
+	_keyword_start,
+		True,  // true
+		False, // false
+		Nil,   // nil
+	_keyword_end,
+
+
+	_operator_start,
+		Question, // ?
+
+		And,   // and
+		Or,    // or
+
+		Add,   // +
+		Sub,   // -
+		Mul,   // *
+		Quo,   // /
+		Rem,   // %
+
+		Not,   // !
+
+		Eq,    // ==
+		NotEq, // !=
+		Lt,    // <
+		Gt,    // >
+		LtEq,  // <=
+		GtEq,  // >=
+
+		At,    // @
+	_operator_end,
+
+	_punc_start,
+		Assign, // =
+
+		Open_Paren,    // (
+		Close_Paren,   // )
+		Open_Bracket,  // [
+		Close_Bracket, // ]
+		Open_Brace,    // {
+		Close_Brace,   // }
+
+		Colon,     // :
+		Semicolon, // ;
+		Comma,     // ,
+		Period,    // .
+	_punc_end,
+}
+
+
+Pos :: struct {
+	file:   string,
+	line:   int,
+	column: int,
+}
+
+Token :: struct {
+	kind:      Kind,
+	using pos: Pos,
+	lit:       string,
+}
+
+Tokenizer :: struct {
+	src: []byte,
+
+	file:        string, // May not be used
+
+	curr_rune:   rune,
+	offset:      int,
+	read_offset: int,
+	line_offset: int,
+	line_count:  int,
+
+	insert_semi: bool,
+
+	error_count: int,
+}
+
+
+keywords := map[string]Kind{
+	"true"  = True,
+	"false" = False,
+	"nil"   = Nil,
+	"and"   = And,
+	"or"    = Or,
+};
+
+kind_to_string := [Kind.count]string{
+	"illegal",
+	"EOF",
+	"comment",
+
+	"",
+	"identifier",
+	"integer",
+	"float",
+	"character",
+	"string",
+	"",
+
+	"",
+	"true", "false", "nil",
+	"",
+
+	"",
+	"?", "and", "or",
+	"+", "-", "*", "/", "%",
+	"!",
+	"==", "!=", "<", ">", "<=", ">=",
+	"@",
+	"",
+
+	"",
+	"=",
+	"(", ")",
+	"[", "]",
+	"{", "}",
+	":", ";", ",", ".",
+	"",
+};
+
+precedence :: proc(op: Kind) -> int {
+	switch op {
+	case Question:
+		return 1;
+	case Or:
+		return 2;
+	case And:
+		return 3;
+	case Eq, NotEq, Lt, Gt, LtEq, GtEq:
+		return 4;
+	case Add, Sub:
+		return 5;
+	case Mul, Quo, Rem:
+		return 6;
+	}
+	return 0;
+}
+
+
+token_lookup :: proc(ident: string) -> Kind {
+	if tok, is_keyword := keywords[ident]; is_keyword {
+		return tok;
+	}
+	return Ident;
+}
+
+is_literal  :: proc(tok: Kind) -> bool do return _literal_start  < tok && tok < _literal_end;
+is_operator :: proc(tok: Kind) -> bool do return _operator_start < tok && tok < _operator_end;
+is_keyword  :: proc(tok: Kind) -> bool do return _keyword_start  < tok && tok < _keyword_end;
+
+
+tokenizer_init :: proc(t: ^Tokenizer, src: []byte, file := "") {
+	t.src = src;
+	t.file = file;
+	t.curr_rune   = ' ';
+	t.offset      = 0;
+	t.read_offset = 0;
+	t.line_offset = 0;
+	t.line_count  = 1;
+
+	advance_to_next_rune(t);
+	if t.curr_rune == utf8.RUNE_BOM {
+		advance_to_next_rune(t);
+	}
+}
+
+token_error :: proc(t: ^Tokenizer, msg: string, args: ...any) {
+	fmt.printf_err("%s(%d:%d) Error: ", t.file, t.line_count, t.read_offset-t.line_offset+1);
+	fmt.printf_err(msg, ...args);
+	fmt.println_err();
+	t.error_count += 1;
+}
+
+advance_to_next_rune :: proc(t: ^Tokenizer) {
+	if t.read_offset < len(t.src) {
+		t.offset = t.read_offset;
+		if t.curr_rune == '\n' {
+			t.line_offset = t.offset;
+			t.line_count += 1;
+		}
+		r, w := rune(t.src[t.read_offset]), 1;
+		switch {
+		case r == 0:
+			token_error(t, "Illegal character NUL");
+		case r >= utf8.RUNE_SELF:
+			r, w = utf8.decode_rune(t.src[t.read_offset..]);
+			if r == utf8.RUNE_ERROR && w == 1 {
+				token_error(t, "Illegal utf-8 encoding");
+			} else if r == utf8.RUNE_BOM && t.offset > 0 {
+				token_error(t, "Illegal byte order mark");
+			}
+		}
+
+		t.read_offset += w;
+		t.curr_rune = r;
+	} else {
+		t.offset = len(t.src);
+		if t.curr_rune == '\n' {
+			t.line_offset = t.offset;
+			t.line_count += 1;
+		}
+		t.curr_rune = utf8.RUNE_EOF;
+	}
+}
+
+
+get_pos :: proc(t: ^Tokenizer) -> Pos {
+	return Pos {
+		file   = t.file,
+		line   = t.line_count,
+		column = t.offset - t.line_offset + 1,
+	};
+}
+
+is_letter :: proc(r: rune) -> bool {
+	switch r {
+	case 'a'...'z', 'A'...'Z', '_':
+		return true;
+	}
+	return false;
+}
+
+is_digit :: proc(r: rune) -> bool {
+	switch r {
+	case '0'...'9':
+		return true;
+	}
+	return false;
+}
+
+skip_whitespace :: proc(t: ^Tokenizer) {
+	loop: for {
+		switch t.curr_rune {
+		case '\n':
+			if t.insert_semi {
+				break loop;
+			}
+			fallthrough;
+		case ' ', '\t', '\r', '\v', '\f':
+			advance_to_next_rune(t);
+
+		case:
+			break loop;
+		}
+	}
+}
+
+scan_identifier :: proc(t: ^Tokenizer) -> string {
+	offset := t.offset;
+	for is_letter(t.curr_rune) || is_digit(t.curr_rune) {
+		advance_to_next_rune(t);
+	}
+	return string(t.src[offset .. t.offset]);
+}
+
+digit_value :: proc(r: rune) -> int {
+	switch r {
+	case '0'...'9': return int(r - '0');
+	case 'a'...'f': return int(r - 'a' + 10);
+	case 'A'...'F': return int(r - 'A' + 10);
+	}
+	return 16;
+}
+
+scan_number :: proc(t: ^Tokenizer, seen_decimal_point: bool) -> (Kind, string) {
+	scan_manitissa :: proc(t: ^Tokenizer, base: int) {
+		for digit_value(t.curr_rune) < base || t.curr_rune == '_' {
+			advance_to_next_rune(t);
+		}
+	}
+	scan_exponent :: proc(t: ^Tokenizer, tok: Kind, offset: int) -> (Kind, string) {
+		if t.curr_rune == 'e' || t.curr_rune == 'E' {
+			tok = Float;
+			advance_to_next_rune(t);
+			if t.curr_rune == '-' || t.curr_rune == '+' {
+				advance_to_next_rune(t);
+			}
+			if digit_value(t.curr_rune) < 10 {
+				scan_manitissa(t, 10);
+			} else {
+				token_error(t, "Illegal floating point exponent");
+			}
+		}
+		return tok, string(t.src[offset .. t.offset]);
+	}
+	scan_fraction :: proc(t: ^Tokenizer, tok: Kind, offset: int) -> (Kind, string) {
+		if t.curr_rune == '.' {
+			tok = Float;
+			advance_to_next_rune(t);
+			scan_manitissa(t, 10);
+		}
+
+		return scan_exponent(t, tok, offset);
+	}
+
+	offset := t.offset;
+	tok := Integer;
+
+	if seen_decimal_point {
+		offset -= 1;
+		tok = Float;
+		scan_manitissa(t, 10);
+		return scan_exponent(t, tok, offset);
+	}
+
+	if t.curr_rune == '0' {
+		offset := t.offset;
+		advance_to_next_rune(t);
+		switch t.curr_rune {
+		case 'b', 'B':
+			advance_to_next_rune(t);
+			scan_manitissa(t, 2);
+			if t.offset - offset <= 2 {
+				token_error(t, "Illegal binary number");
+			}
+		case 'o', 'O':
+			advance_to_next_rune(t);
+			scan_manitissa(t, 8);
+			if t.offset - offset <= 2 {
+				token_error(t, "Illegal octal number");
+			}
+		case 'x', 'X':
+			advance_to_next_rune(t);
+			scan_manitissa(t, 16);
+			if t.offset - offset <= 2 {
+				token_error(t, "Illegal hexadecimal number");
+			}
+		case:
+			scan_manitissa(t, 10);
+			switch t.curr_rune {
+			case '.', 'e', 'E':
+				return scan_fraction(t, tok, offset);
+			}
+		}
+
+		return tok, string(t.src[offset .. t.offset]);
+	}
+
+	scan_manitissa(t, 10);
+
+	return scan_fraction(t, tok, offset);
+}
+
+scan :: proc(t: ^Tokenizer) -> Token {
+	skip_whitespace(t);
+
+	offset := t.offset;
+
+	tok: Kind;
+	pos := get_pos(t);
+	lit: string;
+
+	insert_semi := false;
+
+
+	switch r := t.curr_rune; {
+	case is_letter(r):
+		insert_semi = true;
+		lit = scan_identifier(t);
+		tok = Ident;
+		if len(lit) > 1 {
+			tok = token_lookup(lit);
+		}
+
+	case '0' <= r && r <= '9':
+		insert_semi = true;
+		tok, lit = scan_number(t, false);
+
+	case:
+		advance_to_next_rune(t);
+		switch r {
+		case -1:
+			if t.insert_semi {
+				t.insert_semi = false;
+				return Token{Semicolon, pos, "\n"};
+			}
+			return Token{EOF, pos, "\n"};
+
+		case '\n':
+			t.insert_semi = false;
+			return Token{Semicolon, pos, "\n"};
+
+		case '"':
+			insert_semi = true;
+			quote := r;
+			tok = String;
+			for {
+				r := t.curr_rune;
+				if r == '\n' || r < 0 {
+					token_error(t, "String literal not terminated");
+					break;
+				}
+				advance_to_next_rune(t);
+				if r == quote {
+					break;
+				}
+				// TODO(bill); Handle properly
+				if r == '\\' && t.curr_rune == quote {
+					advance_to_next_rune(t);
+				}
+			}
+
+			lit = string(t.src[offset+1..t.offset-1]);
+
+
+		case '#':
+			for t.curr_rune != '\n' && t.curr_rune >= 0 {
+				advance_to_next_rune(t);
+			}
+			if t.insert_semi {
+				t.insert_semi = false;
+				return Token{Semicolon, pos, "\n"};
+			}
+			// Recursive!
+			return scan(t);
+
+		case '?': tok = Question;
+		case ':': tok = Colon;
+		case '@': tok = At;
+
+		case ';':
+			tok = Semicolon;
+			lit = ";";
+		case ',': tok = Comma;
+
+		case '(':
+			tok = Open_Paren;
+		case ')':
+			insert_semi = true;
+			tok = Close_Paren;
+
+		case '[':
+			tok = Open_Bracket;
+		case ']':
+			insert_semi = true;
+			tok = Close_Bracket;
+
+		case '{':
+			tok = Open_Brace;
+		case '}':
+			insert_semi = true;
+			tok = Close_Brace;
+
+		case '+': tok = Add;
+		case '-': tok = Sub;
+		case '*': tok = Mul;
+		case '/': tok = Quo;
+		case '%': tok = Rem;
+
+		case '!':
+			tok = Not;
+			if t.curr_rune == '=' {
+				advance_to_next_rune(t);
+				tok = NotEq;
+			}
+
+		case '=':
+			tok = Assign;
+			if t.curr_rune == '=' {
+				advance_to_next_rune(t);
+				tok = Eq;
+			}
+
+		case '<':
+			tok = Lt;
+			if t.curr_rune == '=' {
+				advance_to_next_rune(t);
+				tok = LtEq;
+			}
+
+		case '>':
+			tok = Gt;
+			if t.curr_rune == '=' {
+				advance_to_next_rune(t);
+				tok = GtEq;
+			}
+
+		case '.':
+			if '0' <= t.curr_rune && t.curr_rune <= '9' {
+				insert_semi = true;
+				tok, lit = scan_number(t, true);
+			} else {
+				tok = Period;
+			}
+
+		case:
+			if r != utf8.RUNE_BOM {
+				token_error(t, "Illegal character '%r'", r);
+			}
+			insert_semi = t.insert_semi;
+			tok = Illegal;
+		}
+	}
+
+	t.insert_semi = insert_semi;
+
+	if lit == "" {
+		lit = string(t.src[offset .. t.offset]);
+	}
+
+	return Token{tok, pos, lit};
+}
