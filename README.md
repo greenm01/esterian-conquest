@@ -5,4 +5,4 @@ A popular BBS DOOR game from a time before the internet as we know it, EC was al
 
 This is a fan made resurection, written in Odin lang, that you can play (hopefully someday soon, lol) with your nerd friends.
 
-Contributions are welcome.
+STATUS: Work in progress. Not yet playable.
