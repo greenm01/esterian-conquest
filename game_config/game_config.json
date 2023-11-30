@@ -1,0 +1,10 @@
+{
+  "num_players": 4,
+  "host_name": "Toys In The Attic BBS",
+  "sysop_name": "Mason Austin Green",
+  "start_date": "2023-11-29",
+  "start_time": "00:01"
+  "maint_period": 24,
+  "server_ip": "localhost",
+  "port": 1992,
+}
