@@ -15,7 +15,6 @@
   scripts.hello.exec = "echo hello from $GREET";
 
   enterShell = ''
-    Welome, keyboard commander!
     git --version
   '';
 
