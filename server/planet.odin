@@ -1,22 +1,22 @@
-package ec2s
+package server
 
-Position :: struct {
+Sector :: struct {
 	x: int,
 	y: int,
 }
 
 Planet :: struct {
-	key: int,					// Database lookup key
-	pos: Position,				// Starmap position
-	name: string,				// Planet name
-	owner: int,					// Current owner
-	prev_owner: int,			// Previous owner
-	max_prod: int,				// Maximum production
-	cur_prod: int,				// Current production
-	kaspa: int,					// Kaspa currency
-	armies: int,				// Armies
-	ground_batteries: int,		// Ground Batteries
-	star_dock: [dynamic]int,	// Stardock contents
+	key: int,                // Database lookup key
+	pos: Sector,              // Starmap position
+	name: string,            // Planet name
+	owner: int,              // Current owner
+	prev_owner: int,         // Previous owner
+	max_prod: int,           // Maximum production
+	cur_prod: int,           // Current production
+	kaspa: int,              // Kaspa currency
+	armies: int,             // Armies
+	ground_batteries: int,   // Ground Batteries
+	star_dock: [dynamic]int, // Stardock contents
 }
 
 // Player's Planet Database
@@ -34,7 +34,7 @@ Planet_Database :: struct {
 	star_dock: map[int][dynamic]int,
 	armies: map[int]int,
 	ground_batteries: map[int]int,
-	pos: map[int]Position,
+	pos: map[int]Sector,
 }
 
 // Allocate memory for database records

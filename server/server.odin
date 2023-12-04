@@ -1,4 +1,4 @@
-package ec2s
+package server
 
 import "core:fmt"
 import "core:os"

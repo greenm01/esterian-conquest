@@ -1,4 +1,4 @@
-package ec2s
+package server
 
 import "core:fmt"
 import "core:os"
@@ -38,9 +38,22 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	r := 9 * math.pow_f32(f32(num_players), 0.5)
 	grid_size := int(math.ceil_f32(r))
 
-	fmt.println("Grid Size = ", grid_size)
+	// Generate starmap based on a random Poisson distribution
+	// This generates a much nicer distribution over a pure random set
+	// http://devmag.org.za/2009/05/03/poisson-disk-sampling/
+	// Minimum distance between systems is PI. Why not?
+
+	/* TODO: Consider adding perlin noise to distribution */
+
+	starmap := StarMap{}
+
+	gs := f64(grid_size)
+	planets := poisson_sample(0.0, 0.0, gs, gs, math.PI, 50)
+	defer delete(planets)
+
+	fmt.println("num planets = ", len(planets))
+	fmt.println(planets)	
 	
-	star_map := StarMap{}
-	return star_map
+	return starmap
 	
 }
