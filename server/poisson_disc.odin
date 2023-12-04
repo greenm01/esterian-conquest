@@ -39,8 +39,8 @@ poisson_sample :: proc (x0, y0, x1, y1, r: f64, k: int) -> [dynamic]Point {
 	
 	// add the first point
 	{
-		x := x0 + rand.float64_range(x0, x1, &my_rand)
-		y := y0 + rand.float64_range(y0, y1, &my_rand)
+		x := rand.float64_range(x0, x1, &my_rand)
+		y := rand.float64_range(y0, y1, &my_rand)
 		p := Point{x, y}
 		insert_point(&grid, p)
 		append(&active, p)
@@ -106,7 +106,7 @@ new_grid :: proc(x0, y0, x1, y1, r: f64) -> Grid {
 
 	gw := i1 - i0 + 1
 	gh := j1 - j0 + 1
-	cells := make([]Point, gw*gh) // gw*gh)
+	cells := make([]Point, gw*gh) 
 	
 	for _, i in cells {
 		cells[i] = sentinel
