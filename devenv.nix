@@ -8,7 +8,7 @@
   packages = with pkgs; [
     git 
     odin
-    gcc
+    ols
   ];
 
   # https://devenv.sh/scripts/

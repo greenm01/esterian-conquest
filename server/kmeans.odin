@@ -4,6 +4,7 @@ import "core:math/rand"
 import "core:fmt"
 import "core:os"
 
+// k-means clustering to find homeworlds
 // ported from the golang: https://github.com/mash/gokmeans
 
 // Node represents an observation of floating point values
@@ -66,13 +67,11 @@ train2 :: proc(nodes: []Node, cluster_count: int,
 		for node, i in nodes {
 			near := k_nearest(node, centroids)
 			if groups[near] == nil {
-				foo := make([dynamic]Node, 1)
-				foo[0] = node
-				groups[near] = foo 		
+				n := make([dynamic]Node,1)
+				n[0] = node
+				groups[near] = n
 			} else {
-				foo := groups[near]
-				append(&foo, node)
-				groups[near] = foo	
+				append(&groups[near],node)	
 			}
 		}
 			
@@ -85,7 +84,6 @@ train2 :: proc(nodes: []Node, cluster_count: int,
 		}
 	}
 		
-	fmt.println(centroids)
 	return true, centroids
 }
 
