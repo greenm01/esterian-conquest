@@ -55,7 +55,7 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	nodes := make([]Node,len(points))
 	defer delete(nodes)
 
-	starmap.systems = make([]int, len(nodes))
+	starmap.systems = make([]int, len(nodes) + num_players)
 
 	for p, i in points {
 		nodes[i] = Node{p.x, p.y}
@@ -66,24 +66,72 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	fmt.println("done!")
 	fmt.print("Finding homeworlds...")
 	
-	homeworlds := make([]int, num_players)
+	starmap.homeworlds = make([]int, num_players)
 	for count := 1; count < 11; count += 1 {
 		hw := k_means(nodes, num_players, gs)
 		for h, i in hw {
-			homeworlds[i] = cell_pos(grid_size, h[0], h[1])
+			starmap.homeworlds[i] = cell_pos(grid_size, h[0], h[1])
 		}
+		
 		// Make sure we have a unique set
-		if true {break}
+		if count_duplicates(starmap.homeworlds) == 0 {
+			break
+		}
+		
 		if count == 10 {
 			fmt.println("Error resolving homeworlds! Try fewer players.")
 			os.exit(1)
 		}
 		
 	}
-	
+
+	{
+		// add homeworlds to systems
+		j := 0
+		for i := len(nodes); i < len(starmap.systems); i += 1 {
+			starmap.systems[i] = starmap.homeworlds[j]
+			j += 1
+		}
+		// remove duplicates
+		starmap.systems = remove_duplicates(starmap.systems)
+	}
+
 	fmt.println("done!")
-	starmap.homeworlds = homeworlds
-	fmt.println(homeworlds)
 	return starmap
 	
+}
+
+count_duplicates :: proc(dups: []int) -> int {
+	dup_size := len(dups)
+	dup_count := 0
+	for i := 0; i < dup_size; i += 1 {
+		for j := i + 1; j < dup_size; j += 1{
+			if dups[i] == dups[j] {
+				dup_count += 1
+				break
+			}
+		}
+	}
+	return dup_count
+}
+
+remove_duplicates :: proc(elements: []int) -> []int {
+	// Use map to record duplicates as we find them.
+	encountered := map[int]bool{}
+	defer delete(encountered)
+	
+	result := [dynamic]int{}
+	
+	for v, _ in elements {
+		if encountered[v] == true {
+			// Do not add duplicate.
+		} else {
+			// Record this element as an encountered element.
+			encountered[v] = true
+			// Append to result slice.
+			append(&result, v)
+		}
+	}
+	// Return the new slice.
+	return result[:]
 }

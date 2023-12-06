@@ -63,6 +63,7 @@ train2 :: proc(nodes: []Node, cluster_count: int,
 		movement = false
 
 		groups := make(map[int][dynamic]Node)
+		defer delete(groups)
 
 		for node, i in nodes {
 			near := k_nearest(node, centroids)
