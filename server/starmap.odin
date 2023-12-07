@@ -3,6 +3,7 @@ package server
 import "core:fmt"
 import "core:os"
 import "core:math"
+import "core:math/rand"
 
 MAX_PRODUCTION :: 150
 MIN_PRODUCTION :: 10
@@ -35,8 +36,8 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	// Nonlinar power regression gives us a nice distribution
 	// f(x) = 9*x^(-0.5)
 	// https://www.desmos.com/calculator/9itjhjdmig
-	r := 9 * math.pow_f32(f32(num_players), 0.5)
-	grid_size := int(math.ceil_f32(r))
+	npr := 9 * math.pow_f32(f32(num_players), 0.5)
+	grid_size := int(math.ceil_f32(npr))
 
 	// Generate starmap based on a random Poisson distribution
 	// This generates a much nicer distribution over a pure random set
@@ -46,7 +47,8 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	/* TODO: Consider adding perlin noise to distribution */
 
 	starmap := StarMap{}
-
+	starmap.grid_size = grid_size
+	
 	gs := f64(grid_size)
 	// TODO: optomize this function
 	points := poisson_sample(0.0, 0.0, gs, gs, math.PI, 50)
@@ -64,7 +66,7 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	}
 
 	fmt.println("done!")
-	fmt.print("Finding homeworlds...")
+	fmt.print("finding homeworlds...")
 	
 	starmap.homeworlds = make([]int, num_players)
 	for count := 1; count < 11; count += 1 {
@@ -79,7 +81,7 @@ new_starmap :: proc(num_players: int) -> StarMap {
 		}
 		
 		if count == 10 {
-			fmt.println("Error resolving homeworlds! Try fewer players.")
+			fmt.println("error resolving homeworlds! Try fewer players.")
 			os.exit(1)
 		}
 		
@@ -97,6 +99,28 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	}
 
 	fmt.println("done!")
+	fmt.print("randomizing planet production...")
+
+	starmap.planets = make(map[int]Planet)
+	
+	rnd: rand.Rand
+	rand.init_as_system(&rnd)
+
+	prod := MAX_PRODUCTION - MIN_PRODUCTION
+	minprod := MIN_PRODUCTION
+	
+	for c in starmap.systems {
+		x,y := grid_pos(c, grid_size)
+		starmap.planets[c] = Planet{
+			key = c,
+			pos = Sector{x, y},
+			max_prod = rand.int_max(prod, &rnd) + minprod,
+			name = "nameless",
+		}
+	}
+
+	fmt.println("done!")
+	
 	return starmap
 	
 }

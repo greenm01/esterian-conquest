@@ -7,7 +7,7 @@ Sector :: struct {
 
 Planet :: struct {
 	key: int,                // Database lookup key
-	pos: Sector,              // Starmap position
+	pos: Sector,             // Starmap position
 	name: string,            // Planet name
 	owner: int,              // Current owner
 	prev_owner: int,         // Previous owner
@@ -20,7 +20,7 @@ Planet :: struct {
 }
 
 // Player's Planet Database
-Planet_Database :: struct {
+PlanetDB :: struct {
 	// Map keys = Planet.ID
 	name: map[int]string,
 	year_scouted: map[int]int,
@@ -38,7 +38,7 @@ Planet_Database :: struct {
 }
 
 // Allocate memory for database records
-init_planet_database :: proc(data: ^Planet_Database) {
+init_planet_database :: proc(data: ^PlanetDB) {
 	data.name = make(map[int]string)	
 }
 
