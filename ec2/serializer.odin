@@ -1,4 +1,4 @@
-package serializer
+package ec2
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////
 // LBP Serializer
@@ -383,12 +383,43 @@ when SERIALIZER_ENABLE_GENERIC {
         serialize_map,
 
         // Add your custom serialization procedures here
+        serialize_sector,
+        serialize_planet,
+
+        // example
         serialize_foo,
         serialize_bar,
         serialize_baz,
     }
 }
 
+
+serialize_sector :: proc(s: ^Serializer, sector: ^Sector, loc := #caller_location) -> bool {
+    
+    serialize(s, &sector.x, loc) or_return
+    serialize(s, &sector.y, loc) or_return
+    
+    return true
+
+}
+    
+serialize_planet :: proc(s: ^Serializer, planet: ^Planet, loc := #caller_location) -> bool {
+    
+    serialize(s, &planet.key, loc) or_return
+    serialize(s, &planet.pos, loc) or_return
+    serialize(s, &planet.name, loc) or_return
+    serialize(s, &planet.owner, loc) or_return
+    serialize(s, &planet.prev_owner, loc) or_return
+    serialize(s, &planet.max_prod, loc) or_return
+    serialize(s, &planet.cur_prod, loc) or_return
+    serialize(s, &planet.kaspa, loc) or_return
+    serialize(s, &planet.armies, loc) or_return
+    serialize(s, &planet.ground_batteries, loc) or_return
+    serialize(s, &planet.stardock, loc) or_return
+    
+    return true
+
+}
 
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -485,19 +516,26 @@ main :: proc() {
         data = {-10 = {1, 0}, 23 = {2, 3}, 62 = {6, 2}},
     }
 
+    sector: Sector = {01, 77}
+    
     fmt.println("Hello")
     fmt.println(bar)
+    fmt.println(sector)
 
     serialize_bar(&s, &bar)
+    serialize(&s, &sector)
 
     {
         data := s.data[:]
         s: Serializer
         serializer_init_reader(&s, data)
         new_bar: Bar
+        new_sector: Sector
         serialize_bar(&s, &new_bar)
+        serialize(&s, &new_sector)
 
         fmt.println(new_bar)
+        fmt.println(new_sector)
 
         assert(compare_bar(bar, new_bar))
     }

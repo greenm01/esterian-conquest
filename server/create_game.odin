@@ -5,6 +5,9 @@ import "core:fmt"
 import "core:encoding/json"
 import "core:strings"
 
+//import "../ec2/serializer"
+//szr :: serializer
+
 create_game :: proc(config_data: json.Value) {
 	
 	fmt.println("################################")
@@ -114,7 +117,10 @@ create_game :: proc(config_data: json.Value) {
 	fmt.println("done!")
 
 	/* TODO: serialize game data and save to disk */
-	
+	//s: szr.Serializer
+
+	//szr.serialize(s, empires[0].planet_db.pos)
+			
 }
 
 
