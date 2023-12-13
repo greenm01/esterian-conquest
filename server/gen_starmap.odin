@@ -5,29 +5,12 @@ import "core:os"
 import "core:math"
 import "core:math/rand"
 
+import "../ec"
+
 MAX_PRODUCTION :: 150
 MIN_PRODUCTION :: 10
 
-StarMap :: struct {
-	planets: map[int]Planet,
-	grid_size: int,
-	systems: []int,
-	homeworlds: []int,
-}
-
-// Return x,y grid coordinates of cell number
-// Cell 1 starts at (0,0)
-grid_pos :: proc(c: int, grid: int) -> (int, int) {
-	return (c - 1) % grid, (c - 1) / grid
-}
-
-// Return the cell number of given x,y coordinates
-// (0,0) starts at cell 1
-cell_pos :: proc(grid: int, x: int, y: int) -> int {
-	return grid*y + x + 1
-}
-
-new_starmap :: proc(num_players: int) -> StarMap {
+gen_starmap :: proc(num_players: int) -> ec.StarMap {
 	
 	fmt.print("generating starmap...")
 
@@ -46,7 +29,7 @@ new_starmap :: proc(num_players: int) -> StarMap {
 
 	/* TODO: Consider adding perlin noise to distribution */
 
-	starmap := StarMap{}
+	starmap := ec.StarMap{}
 	starmap.grid_size = grid_size
 	
 	gs := f64(grid_size)
@@ -61,7 +44,7 @@ new_starmap :: proc(num_players: int) -> StarMap {
 
 	for p, i in points {
 		nodes[i] = Node{p.x, p.y}
-		c := cell_pos(grid_size, int(p.x), int(p.y))
+		c := ec.cell_pos(grid_size, int(p.x), int(p.y))
 		starmap.systems[i] = c
 	}
 
@@ -72,7 +55,7 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	for count := 1; count < 11; count += 1 {
 		hw := k_means(nodes, num_players, gs)
 		for h, i in hw {
-			starmap.homeworlds[i] = cell_pos(grid_size, h[0], h[1])
+			starmap.homeworlds[i] = ec.cell_pos(grid_size, h[0], h[1])
 		}
 		
 		// Make sure we have a unique set
@@ -101,7 +84,7 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	fmt.println("done!")
 	fmt.print("randomizing planet production...")
 
-	starmap.planets = make(map[int]Planet)
+	starmap.planets = make(map[int]ec.Planet)
 	
 	rnd: rand.Rand
 	rand.init_as_system(&rnd)
@@ -110,10 +93,10 @@ new_starmap :: proc(num_players: int) -> StarMap {
 	minprod := MIN_PRODUCTION
 	
 	for c in starmap.systems {
-		x,y := grid_pos(c, grid_size)
-		starmap.planets[c] = Planet{
+		x,y := ec.grid_pos(c, grid_size)
+		starmap.planets[c] = ec.Planet{
 			key = c,
-			pos = Sector{x, y},
+			pos = ec.Sector{x, y},
 			max_prod = rand.int_max(prod, &rnd) + minprod,
 			name = "nameless",
 		}

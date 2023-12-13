@@ -5,6 +5,8 @@ import "core:fmt"
 import "core:encoding/json"
 import "core:strings"
 
+import "../ec"
+
 //import "../ec2/serializer"
 //szr :: serializer
 
@@ -21,7 +23,7 @@ create_game :: proc(config_data: json.Value) {
 	config := config_data.(json.Object)	
 	num_players := int(config["num_players"].(json.Float))
 
-	starmap := new_starmap(num_players)
+	starmap := gen_starmap(num_players)
 	
 	/* #########################
 	   ##### EMPIRE SETUP  #####
@@ -29,7 +31,7 @@ create_game :: proc(config_data: json.Value) {
 
 	fmt.print("creating empires...")
 	
-	empires := make(map[int]Empire)
+	empires := make(map[int]ec.Empire)
 	defer delete(empires)
 	
 	// create empires and assign homeworlds
@@ -39,7 +41,7 @@ create_game :: proc(config_data: json.Value) {
 		strings.write_string(&builder, "Rogue ")
 		strings.write_int(&builder, id)
 		rogue := strings.to_string(builder)
-		empires[id] = Empire {
+		empires[id] = ec.Empire {
 			key = id,
 			name = rogue,
 			planets = []int{hw},
@@ -70,11 +72,11 @@ create_game :: proc(config_data: json.Value) {
 
 	for _, empire in &empires {
 		// create fleets
-		fleets := make(map[int]Fleet)
+		fleets := make(map[int]ec.Fleet)
 		defer delete(fleets)
 		
 		for f := 0; f < 4; f +=1 {
-			fleets[f] = Fleet {
+			fleets[f] = ec.Fleet {
 				key = f,
 				roe = 6,
 				speed = 0,
@@ -83,15 +85,18 @@ create_game :: proc(config_data: json.Value) {
 			}
 		}
 
-		ships := make(map[int][]Ship)
+		ships := make(map[int][]ec.Ship)
 		defer delete(ships)
 
-		// TODO: Do ships need keys? Probably not		
-		ships[0] = []Ship{Ship{key = 1, class = 2}, Ship{key = 2, class = 6}}
-		ships[1] = []Ship{Ship{key = 3, class = 2}, Ship{key = 4, class = 6}}
-		ships[2] = []Ship{Ship{key = 5, class = 1}}
-		ships[3] = []Ship{Ship{key = 6, class = 1}}
-
+		{
+			Ship :: ec.Ship
+			// TODO: Do ships need keys? Probably not		
+			ships[0] = []Ship{Ship{key = 1, class = 2}, Ship{key = 2, class = 6}}
+			ships[1] = []Ship{Ship{key = 3, class = 2}, Ship{key = 4, class = 6}}
+			ships[2] = []Ship{Ship{key = 5, class = 1}}
+			ships[3] = []Ship{Ship{key = 6, class = 1}}
+		}
+		
 		for key, f in &fleets {
 			f.ships = ships[key]
 		}
@@ -99,8 +104,8 @@ create_game :: proc(config_data: json.Value) {
 		empire.fleets = fleets
 
 		// create empire database
-		empire.planet_db = PlanetDB{}
-		init_planet_db(&empire.planet_db)
+		empire.planet_db = ec.PlanetDB{}
+		ec.init_planet_db(&empire.planet_db)
 
 		for key, p in starmap.planets {
 			empire.planet_db.year_viewed[key] = -1
@@ -111,7 +116,7 @@ create_game :: proc(config_data: json.Value) {
 
 	// cleanup database memory
 	for _, e in &empires {
-		del_planet_db(&e.planet_db)
+		ec.del_planet_db(&e.planet_db)
 	}
 
 	fmt.println("done!")
@@ -123,4 +128,12 @@ create_game :: proc(config_data: json.Value) {
 			
 }
 
-
+init_homeworld :: proc(p: ^ec.Planet, empire: int) {
+	p.owner = empire
+	p.prev_owner = -1
+	p.max_prod = 100
+	p.cur_prod = 100
+	p.kaspa = 50
+	p.armies = 100
+	p.ground_batteries = 25
+}

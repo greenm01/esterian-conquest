@@ -29,15 +29,7 @@ serialize_planet :: proc(s: ^Serializer, p: ^Planet, loc := #caller_location) ->
     return true
 }
 		
-init_homeworld :: proc(p: ^Planet, empire: int) {
-	p.owner = empire
-	p.prev_owner = -1
-	p.max_prod = 100
-	p.cur_prod = 100
-	p.kaspa = 50
-	p.armies = 100
-	p.ground_batteries = 25
-}
+
 
 // Planet Database
 PlanetDB :: struct {
