@@ -40,7 +40,7 @@ PlanetDB :: struct {
 	kaspa: map[int]int,
 	owner: map[int]int,
 	prev_owner: map[int]int,
-	ownedFor: map[int]int,
+	owned_for: map[int]int,
 	star_dock: map[int][]int,
 	armies: map[int]int,
 	ground_batteries: map[int]int,

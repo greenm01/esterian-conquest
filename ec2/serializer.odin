@@ -385,15 +385,60 @@ when SERIALIZER_ENABLE_GENERIC {
         // Add your custom serialization procedures here
         serialize_sector,
         serialize_planet,
-
+        serialize_ship,
+        serialize_fleet,
+        serialize_starmap,
+        serialize_message,
+        serialize_reports,
+        serialize_planet_db,
+        
         // example
         serialize_foo,
         serialize_bar,
         serialize_baz,
     }
 }
+    
+serialize_message :: proc(s: ^Serializer, message: ^Message, loc := #caller_location) -> bool {
+    
+    serialize(s, &message.text, loc) or_return
+    
+    return true
 
+}
+    
+serialize_reports :: proc(s: ^Serializer, report: ^Report, loc := #caller_location) -> bool {
+    
+    serialize(s, &report.text, loc) or_return
+    
+    return true
 
+}
+serialize_ship :: proc(s: ^Serializer, ship: ^Ship, loc := #caller_location) -> bool {
+    
+    serialize(s, &ship.key, loc) or_return
+    serialize(s, &ship.class, loc) or_return
+    serialize(s, &ship.armies, loc) or_return
+    
+    return true
+
+}
+
+serialize_fleet :: proc(s: ^Serializer, fleet: ^Fleet, loc := #caller_location) -> bool {
+    
+    serialize(s, &fleet.key, loc) or_return
+    serialize(s, &fleet.ships, loc) or_return
+    serialize(s, &fleet.pos, loc) or_return
+    serialize(s, &fleet.speed, loc) or_return
+    serialize(s, &fleet.max_speed, loc) or_return
+    serialize(s, &fleet.roe, loc) or_return
+    serialize(s, &fleet.eta, loc) or_return
+    serialize(s, &fleet.orders, loc) or_return
+    
+    return true
+
+}
+    
 serialize_sector :: proc(s: ^Serializer, sector: ^Sector, loc := #caller_location) -> bool {
     
     serialize(s, &sector.x, loc) or_return
@@ -421,6 +466,36 @@ serialize_planet :: proc(s: ^Serializer, planet: ^Planet, loc := #caller_locatio
 
 }
 
+serialize_planet_db :: proc(s: ^Serializer, db: ^PlanetDB, loc := #caller_location) -> bool {
+    
+    serialize(s, &db.name, loc) or_return
+    serialize(s, &db.year_scouted, loc) or_return
+    serialize(s, &db.year_viewed, loc) or_return
+    serialize(s, &db.max_prod, loc) or_return
+    serialize(s, &db.cur_prod, loc) or_return
+    serialize(s, &db.kaspa, loc) or_return
+    serialize(s, &db.owner, loc) or_return
+    serialize(s, &db.prev_owner, loc) or_return
+    serialize(s, &db.owned_for, loc) or_return
+    serialize(s, &db.star_dock, loc) or_return
+    serialize(s, &db.armies, loc) or_return
+    serialize(s, &db.ground_batteries, loc) or_return
+    serialize(s, &db.pos, loc) or_return
+        
+    return true
+
+}
+    
+serialize_starmap :: proc(s: ^Serializer, starmap: ^StarMap, loc := #caller_location) -> bool {
+    
+    serialize(s, &starmap.planets, loc) or_return
+    serialize(s, &starmap.grid_size, loc) or_return
+    serialize(s, &starmap.systems, loc) or_return
+    serialize(s, &starmap.homeworlds, loc) or_return
+    
+    return true
+
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 // Example
