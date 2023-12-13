@@ -1,4 +1,4 @@
-package ec2
+package ec
 
 import "core:fmt"
 import "core:os"
@@ -13,6 +13,14 @@ StarMap :: struct {
 	grid_size: int,
 	systems: []int,
 	homeworlds: []int,
+}
+
+serialize_starmap :: proc(s: ^Serializer, starmap: ^StarMap, loc := #caller_location) -> bool {
+    serialize(s, &starmap.planets, loc) or_return
+    serialize(s, &starmap.grid_size, loc) or_return
+    serialize(s, &starmap.systems, loc) or_return
+    serialize(s, &starmap.homeworlds, loc) or_return
+    return true
 }
 
 // Return x,y grid coordinates of cell number

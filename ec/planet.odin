@@ -1,9 +1,4 @@
-package ec2
-
-Sector :: struct {
-	x: int,
-	y: int,
-}
+package ec
 
 Planet :: struct {
 	key: int,                // Database lookup key
@@ -19,6 +14,21 @@ Planet :: struct {
 	stardock: []int, 		 // Stardock contents
 }
 
+serialize_planet :: proc(s: ^Serializer, p: ^Planet, loc := #caller_location) -> bool {
+    serialize(s, &p.key, loc) or_return
+    serialize(s, &p.pos, loc) or_return
+    serialize(s, &p.name, loc) or_return
+    serialize(s, &p.owner, loc) or_return
+    serialize(s, &p.prev_owner, loc) or_return
+    serialize(s, &p.max_prod, loc) or_return
+    serialize(s, &p.cur_prod, loc) or_return
+    serialize(s, &p.kaspa, loc) or_return
+    serialize(s, &p.armies, loc) or_return
+    serialize(s, &p.ground_batteries, loc) or_return
+    serialize(s, &p.stardock, loc) or_return
+    return true
+}
+		
 init_homeworld :: proc(p: ^Planet, empire: int) {
 	p.owner = empire
 	p.prev_owner = -1
@@ -45,6 +55,23 @@ PlanetDB :: struct {
 	armies: map[int]int,
 	ground_batteries: map[int]int,
 	pos: map[int]Sector,
+}
+
+serialize_planet_db :: proc(s: ^Serializer, db: ^PlanetDB, loc := #caller_location) -> bool {
+    serialize(s, &db.name, loc) or_return
+    serialize(s, &db.year_scouted, loc) or_return
+    serialize(s, &db.year_viewed, loc) or_return
+    serialize(s, &db.max_prod, loc) or_return
+    serialize(s, &db.cur_prod, loc) or_return
+    serialize(s, &db.kaspa, loc) or_return
+    serialize(s, &db.owner, loc) or_return
+    serialize(s, &db.prev_owner, loc) or_return
+    serialize(s, &db.owned_for, loc) or_return
+    serialize(s, &db.star_dock, loc) or_return
+    serialize(s, &db.armies, loc) or_return
+    serialize(s, &db.ground_batteries, loc) or_return
+    serialize(s, &db.pos, loc) or_return
+    return true
 }
 
 // Allocate memory for database records
