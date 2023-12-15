@@ -66,7 +66,6 @@ create_game :: proc(game_config: ec.GameConfig) {
 	for _, empire in &empires {
 		// create fleets
 		fleets := make(map[int]ec.Fleet)
-		defer delete(fleets)
 		
 		for f := 0; f < 4; f +=1 {
 			fleets[f] = ec.Fleet {
@@ -107,17 +106,36 @@ create_game :: proc(game_config: ec.GameConfig) {
 		}		
 	}
 
+	fmt.println("done!")
+	fmt.print("Serialising game data...")
+	
+	/* Serialize game data and save to disk */
+	game_data := ec.GameData {game_config, starmap, empires}
+	
+	s: ec.Serializer
+	ec.serializer_init_writer(&s)
+	ec.serialize(&s, &game_data)
+
+	/*
+	{
+		fmt.println("deserialize")
+		data := s.data[:]
+		s: ec.Serializer
+		ec.serializer_init_reader(&s, data)
+		d: ec.GameData
+		ec.serialize(&s, &d)
+		fmt.println(data)
+		fmt.println(d)
+	}
+	*/
+	
+	fmt.println("done!")
+
 	// cleanup database memory
 	for _, e in &empires {
 		ec.del_planet_db(&e.planet_db)
 	}
-
-	fmt.println("done!")
-
-	/* Serialize game data and save to disk */
-
-	game_data := ec.GameData {game_config, starmap, empires}
-			
+		
 }
 
 init_homeworld :: proc(p: ^ec.Planet, empire: int) {
