@@ -1,5 +1,8 @@
 package ec
 
+MAX_PRODUCTION :: 150
+MIN_PRODUCTION :: 10
+	
 Planet :: struct {
 	key: int,                // Database lookup key
 	pos: Sector,             // Starmap position
@@ -28,10 +31,8 @@ serialize_planet :: proc(s: ^Serializer, p: ^Planet, loc := #caller_location) ->
     serialize(s, &p.stardock, loc) or_return
     return true
 }
-		
 
-
-// Planet Database
+// Player planet Database
 PlanetDB :: struct {
 	// Map keys = planet's key
 	name: map[int]string,
@@ -47,23 +48,6 @@ PlanetDB :: struct {
 	armies: map[int]int,
 	ground_batteries: map[int]int,
 	pos: map[int]Sector,
-}
-
-serialize_planet_db :: proc(s: ^Serializer, db: ^PlanetDB, loc := #caller_location) -> bool {
-    serialize(s, &db.name, loc) or_return
-    serialize(s, &db.year_scouted, loc) or_return
-    serialize(s, &db.year_viewed, loc) or_return
-    serialize(s, &db.max_prod, loc) or_return
-    serialize(s, &db.cur_prod, loc) or_return
-    serialize(s, &db.kaspa, loc) or_return
-    serialize(s, &db.owner, loc) or_return
-    serialize(s, &db.prev_owner, loc) or_return
-    serialize(s, &db.owned_for, loc) or_return
-    serialize(s, &db.star_dock, loc) or_return
-    serialize(s, &db.armies, loc) or_return
-    serialize(s, &db.ground_batteries, loc) or_return
-    serialize(s, &db.pos, loc) or_return
-    return true
 }
 
 // Allocate memory for database records
@@ -98,4 +82,21 @@ del_planet_db :: proc(db: ^PlanetDB) {
 	delete(db.armies)
 	delete(db.ground_batteries)
 	delete(db.pos)
+}
+
+serialize_planet_db :: proc(s: ^Serializer, db: ^PlanetDB, loc := #caller_location) -> bool {
+    serialize(s, &db.name, loc) or_return
+    serialize(s, &db.year_scouted, loc) or_return
+    serialize(s, &db.year_viewed, loc) or_return
+    serialize(s, &db.max_prod, loc) or_return
+    serialize(s, &db.cur_prod, loc) or_return
+    serialize(s, &db.kaspa, loc) or_return
+    serialize(s, &db.owner, loc) or_return
+    serialize(s, &db.prev_owner, loc) or_return
+    serialize(s, &db.owned_for, loc) or_return
+    serialize(s, &db.star_dock, loc) or_return
+    serialize(s, &db.armies, loc) or_return
+    serialize(s, &db.ground_batteries, loc) or_return
+    serialize(s, &db.pos, loc) or_return
+    return true
 }

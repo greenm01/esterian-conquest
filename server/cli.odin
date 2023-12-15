@@ -6,6 +6,8 @@ import "core:fmt"
 import "core:encoding/json"
 import "core:strings"
 
+import "../ec"
+
 Commands :: enum {
 	NewGame,
 	Maintenance,
@@ -58,9 +60,9 @@ parse_args :: proc(cli_args: []string) {
 	switch command {
 	case NewGame:
 		check_2nd_argument(arguments)
-		config := load_config(arguments[1])
-		defer json.destroy_value(config)
-		create_game(config)
+		game_config := load_config(arguments[1])
+		//defer json.destroy_value(game_config)
+		create_game(game_config)
 	case Maintenance:
 		check_2nd_argument(arguments)
 		fmt.println("running game maintenance...")
@@ -89,7 +91,7 @@ check_2nd_argument :: proc(arguments: []string) {
 	}
 }
 
-load_config :: proc(directory: string) -> json.Value {
+load_config :: proc(directory: string) -> ec.GameConfig {
 	
 	fmt.printf("loading %s...\n", CONFIG_FILE)
 	
@@ -117,7 +119,7 @@ load_config :: proc(directory: string) -> json.Value {
 
 	// check the config file format
 	for key in config {
-		if key != "num_players" && key != "host_name" && key != "game_name" &&
+		if key != "num_empires" && key != "host_name" && key != "game_name" &&
 			 key != "server_ip" && key != "port" {
 			fmt.eprintln("ERROR: Incorrect config format!")
 			os.exit(1)		
@@ -125,30 +127,38 @@ load_config :: proc(directory: string) -> json.Value {
 	}
 		
 	// Check for minimum number of players
-	num_players := config["num_players"].(json.Float)
-	if num_players < 2 {
-		fmt.eprintln("ERROR: Minimum number of players is two!")
+	num_empires := int(config["num_empires"].(json.Float))
+	if num_empires < 2 {
+		fmt.eprintln("ERROR: Minimum number of empires is two!")
 		os.exit(1)
 	}	
 
-	// Check the start date
-
-
-	// Check the start time
-		
-	fmt.println(
-		"  players:",
-		i32(config["num_players"].(json.Float)),
-		"\n  host name:",
-		config["host_name"],
-		"\n  game name:",
-		config["game_name"],
-		"\n  server ip:",
-		config["server_ip"],
-		"\n  port:",
-		i32(config["port"].(json.Float)),
-	)
+	host_name := config["host_name"].(json.String)
+	game_name := config["game_name"].(json.String)
+	server_ip := config["server_ip"].(json.String)
+	port := int(config["port"].(json.Float))
 	
-	return config_data
+	fmt.println(
+		"  number of empires:",
+		num_empires,
+		"\n  host name:",
+		host_name,
+		"\n  game name:",
+		game_name,
+		"\n  server ip:",
+		server_ip,
+		"\n  port:",
+		port,
+	)
+
+	game_config := ec.GameConfig {
+		num_empires,
+		host_name,
+		game_name,
+		server_ip,
+		port,
+	}
+	
+	return game_config
 
 }

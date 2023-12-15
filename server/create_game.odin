@@ -2,15 +2,11 @@ package server
 
 import "core:os"
 import "core:fmt"
-import "core:encoding/json"
 import "core:strings"
 
 import "../ec"
 
-//import "../ec2/serializer"
-//szr :: serializer
-
-create_game :: proc(config_data: json.Value) {
+create_game :: proc(game_config: ec.GameConfig) {
 	
 	fmt.println("################################")
 	fmt.println("##### Creating New EC Game #####")
@@ -20,10 +16,7 @@ create_game :: proc(config_data: json.Value) {
 	   ##### STARMAP & PLANETS #####
 	   ############################# */	
 
-	config := config_data.(json.Object)	
-	num_players := int(config["num_players"].(json.Float))
-
-	starmap := gen_starmap(num_players)
+	starmap := gen_starmap(game_config.num_empires)
 	
 	/* #########################
 	   ##### EMPIRE SETUP  #####
@@ -121,10 +114,9 @@ create_game :: proc(config_data: json.Value) {
 
 	fmt.println("done!")
 
-	/* TODO: serialize game data and save to disk */
-	//s: szr.Serializer
+	/* Serialize game data and save to disk */
 
-	//szr.serialize(s, empires[0].planet_db.pos)
+	game_data := ec.GameData {game_config, starmap, empires}
 			
 }
 

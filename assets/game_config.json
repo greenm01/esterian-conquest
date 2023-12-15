@@ -1,5 +1,5 @@
 {
-  "num_players": 4,
+  "num_empires": 4,
   "host_name": "Toys In The Attic Game Server",
   "game_name": "EC Game #69",
   "server_ip": "localhost",

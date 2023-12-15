@@ -383,6 +383,8 @@ when SERIALIZER_ENABLE_GENERIC {
         serialize_map,
 
         // Add your custom serialization procedures here
+        serialize_game_data,
+        serialize_game_config,
         serialize_empire,
         serialize_sector,
         serialize_planet,

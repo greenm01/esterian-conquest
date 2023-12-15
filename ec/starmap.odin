@@ -5,9 +5,6 @@ import "core:os"
 import "core:math"
 import "core:math/rand"
 
-MAX_PRODUCTION :: 150
-MIN_PRODUCTION :: 10
-
 StarMap :: struct {
 	planets: map[int]Planet,
 	grid_size: int,
