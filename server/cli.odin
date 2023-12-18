@@ -60,15 +60,17 @@ parse_args :: proc(cli_args: []string) {
 	switch command {
 	case NewGame:
 		check_2nd_argument(arguments)
-		game_config := load_config(arguments[1])
-		//defer json.destroy_value(game_config)
-		create_game(game_config)
+		path := arguments[1]
+		game_config := load_config(path)
+		create_game(game_config, path)
 	case Maintenance:
 		check_2nd_argument(arguments)
 		fmt.println("running game maintenance...")
 	case Daemon:
 		check_2nd_argument(arguments)
-		fmt.println("starting game daemon...")
+		path := arguments[1]
+		game_config := load_config(path)
+		init_server(game_config)
 	case Stats:
 		check_2nd_argument(arguments)
 		fmt.println("show game stats: TODO")
@@ -91,12 +93,12 @@ check_2nd_argument :: proc(arguments: []string) {
 	}
 }
 
-load_config :: proc(directory: string) -> ec.GameConfig {
+load_config :: proc(path: string) -> ec.GameConfig {
 	
 	fmt.printf("loading %s...\n", CONFIG_FILE)
 	
-	a := [2]string{directory, CONFIG_FILE}
-	filename := strings.concatenate(a[:])
+	f := [2]string{path, CONFIG_FILE}
+	filename := strings.concatenate(f[:])
 		
 	// Load in your json file!
 	data, ok := os.read_entire_file_from_filename(filename)

@@ -6,11 +6,11 @@ import "core:strings"
 
 import "../ec"
 
-create_game :: proc(game_config: ec.GameConfig) {
+create_game :: proc(game_config: ec.GameConfig, path: string) {
 	
-	fmt.println("################################")
-	fmt.println("##### Creating New EC Game #####")
-	fmt.println("################################")
+	fmt.println("#################################")
+	fmt.println("##### Creating New EC2 Game #####")
+	fmt.println("#################################")
 
 	/* #############################
 	   ##### STARMAP & PLANETS #####
@@ -82,11 +82,10 @@ create_game :: proc(game_config: ec.GameConfig) {
 
 		{
 			Ship :: ec.Ship
-			// TODO: Do ships need keys? Probably not		
-			ships[0] = []Ship{Ship{key = 1, class = 2}, Ship{key = 2, class = 6}}
-			ships[1] = []Ship{Ship{key = 3, class = 2}, Ship{key = 4, class = 6}}
-			ships[2] = []Ship{Ship{key = 5, class = 1}}
-			ships[3] = []Ship{Ship{key = 6, class = 1}}
+			ships[0] = []Ship{Ship{class = 2}, Ship{class = 6}}
+			ships[1] = []Ship{Ship{class = 2}, Ship{class = 6}}
+			ships[2] = []Ship{Ship{class = 1}}
+			ships[3] = []Ship{Ship{class = 1}}
 		}
 		
 		for key, f in &fleets {
@@ -107,29 +106,41 @@ create_game :: proc(game_config: ec.GameConfig) {
 	}
 
 	fmt.println("done!")
-	fmt.print("Serialising game data...")
+	fmt.print("Serializing game data...")
 	
-	/* Serialize game data and save to disk */
+	/* ##################################################
+	   ##### SERIALIZE GAME DATA AND WRITE TO DISK  #####
+	   ################################################## */
+	
 	game_data := ec.GameData {game_config, starmap, empires}
 	
 	s: ec.Serializer
 	ec.serializer_init_writer(&s)
 	ec.serialize(&s, &game_data)
 
-	/*
+	f := [2]string{path, DATA_FILE}
+	filename := strings.concatenate(f[:])
+	
+	os.write_entire_file(filename, s.data[:])
+
+	/*	
 	{
-		fmt.println("deserialize")
-		data := s.data[:]
+		data, ok := os.read_entire_file(filename, context.allocator)
+		if !ok {
+			fmt.println("error opening game data file!")
+			os.exit(1)
+		}
+		defer delete(data, context.allocator)
 		s: ec.Serializer
 		ec.serializer_init_reader(&s, data)
 		d: ec.GameData
 		ec.serialize(&s, &d)
-		fmt.println(data)
 		fmt.println(d)
 	}
 	*/
 	
 	fmt.println("done!")
+	fmt.println("game data written to:", filename)
 
 	// cleanup database memory
 	for _, e in &empires {
@@ -137,13 +148,13 @@ create_game :: proc(game_config: ec.GameConfig) {
 	}
 		
 }
-
+	
 init_homeworld :: proc(p: ^ec.Planet, empire: int) {
 	p.owner = empire
 	p.prev_owner = -1
-	p.max_prod = 100
-	p.cur_prod = 100
-	p.kaspa = 50
-	p.armies = 100
-	p.ground_batteries = 25
+	p.max_prod = HOMEWORLD_MAX_PROD
+	p.cur_prod = HOMEWORLD_START_PROD
+	p.kaspa = HOMEWORLD_KASPA
+	p.armies = HOMEWORLD_ARMIES
+	p.ground_batteries = HOMEWORLD_GROUND_BATTERIES
 }
