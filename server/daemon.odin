@@ -1,31 +1,37 @@
 package server
 
+// https://github.com/GoNZooo/protohackers-stream/blob/main/means_to_an_end/means_to_an_end.odin 
+
 import "core:fmt"
 import "core:os"
-import "vendor:ENet"
+import "core:net"
+import "core:log"
+import "core:thread"
+
 import "../ec"
 
-en :: ENet
-
-init_server :: proc(config: ec.GameConfig) {
-
+init_server :: proc(config: ec.GameConfig, path: string) {
 	fmt.print("starting game daemon...")
-
-	if en.initialize() != 0 {
-		fmt.println("An error occurred while initializing ENet")
-		os.exit(1)
-	}
-
-	address := en.Address {en.HOST_ANY, u16(config.port)}
-	host := en.host_create(&address, 32, 2, 0, 0)
-	if host == nil {
-		fmt.println("An error occurred while trying to create an ENet server host")
-		os.exit(1)
-	}
 	
-	en.host_destroy(host)
-	en.deinitialize()
+	endpoint := net.Endpoint {
+		address = net.IP4_Address([4]u8{0, 0, 0, 0}),
+		port    = config.port,
+	}
 
+	listen_socket, ok := net.listen_tcp(endpoint)
+	if ok != nil {
+		fmt.printf("Error listening on port %d: %v", config.port, ok)
+
+		os.exit(1)
+	}
+
+	log.infof("Listening on port %d", config.port)
+
+	thread_pool: thread.Pool
+	thread.pool_init(&thread_pool, context.allocator, 100)
+	thread.pool_start(&thread_pool)
+
+	game_data := load_game_data(path)
+	
 	fmt.println("done!")
-		
 }

@@ -386,6 +386,7 @@ when SERIALIZER_ENABLE_GENERIC {
         serialize_game_data,
         serialize_game_config,
         serialize_empire,
+        serialize_player,
         serialize_sector,
         serialize_planet,
         serialize_ship,

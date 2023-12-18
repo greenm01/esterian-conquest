@@ -70,7 +70,7 @@ parse_args :: proc(cli_args: []string) {
 		check_2nd_argument(arguments)
 		path := arguments[1]
 		game_config := load_config(path)
-		init_server(game_config)
+		init_server(game_config, path)
 	case Stats:
 		check_2nd_argument(arguments)
 		fmt.println("show game stats: TODO")
@@ -97,11 +97,9 @@ load_config :: proc(path: string) -> ec.GameConfig {
 	
 	fmt.printf("loading %s...\n", CONFIG_FILE)
 	
-	f := [2]string{path, CONFIG_FILE}
-	filename := strings.concatenate(f[:])
-		
 	// Load in your json file!
-	data, ok := os.read_entire_file_from_filename(filename)
+	cfg := config_file(path)
+	data, ok := os.read_entire_file_from_filename(cfg)
 	if !ok {
 		fmt.eprintln("Failed to load the config file!")
 		os.exit(1)

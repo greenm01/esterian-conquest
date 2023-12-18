@@ -106,38 +106,27 @@ create_game :: proc(game_config: ec.GameConfig, path: string) {
 	}
 
 	fmt.println("done!")
-	fmt.print("Serializing game data...")
+	fmt.print("serializing game data...")
 	
 	/* ##################################################
 	   ##### SERIALIZE GAME DATA AND WRITE TO DISK  #####
 	   ################################################## */
 	
-	game_data := ec.GameData {game_config, starmap, empires}
+	game_data := ec.GameData {
+		false,
+		START_YEAR,
+		game_config, 
+		starmap, 
+		empires,
+		make(map[int]ec.Player),
+	}
 	
 	s: ec.Serializer
 	ec.serializer_init_writer(&s)
 	ec.serialize(&s, &game_data)
 
-	f := [2]string{path, DATA_FILE}
-	filename := strings.concatenate(f[:])
-	
+	filename := data_file(path)
 	os.write_entire_file(filename, s.data[:])
-
-	/*	
-	{
-		data, ok := os.read_entire_file(filename, context.allocator)
-		if !ok {
-			fmt.println("error opening game data file!")
-			os.exit(1)
-		}
-		defer delete(data, context.allocator)
-		s: ec.Serializer
-		ec.serializer_init_reader(&s, data)
-		d: ec.GameData
-		ec.serialize(&s, &d)
-		fmt.println(d)
-	}
-	*/
 	
 	fmt.println("done!")
 	fmt.println("game data written to:", filename)
