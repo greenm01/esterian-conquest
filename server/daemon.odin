@@ -7,8 +7,34 @@ import "core:os"
 import "core:net"
 import "core:log"
 import "core:thread"
+import "core:mem"
+import "core:mem/virtual"
 
 import "../ec"
+
+ClientData :: struct {
+	endpoint:  net.Endpoint,
+	socket:    net.TCP_Socket,
+}
+
+Message :: union {
+	Join,
+	Query,
+	Command,
+}
+
+Join :: struct {
+	player: string,
+	password: string,
+}
+
+Query :: struct {
+	query: string,
+}
+
+Command :: struct {
+	command: string,
+}
 
 init_server :: proc(config: ec.GameConfig, path: string) {
 	fmt.print("starting game daemon...")
@@ -33,5 +59,149 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 
 	game_data := load_game_data(path)
 	
+	for {
+			client_socket, client_endpoint, accept_error := net.accept_tcp(listen_socket)
+			if accept_error != nil {
+				log.errorf("Error accepting connection: %v", accept_error)
+
+				continue
+			}
+			log.debugf("Accepted connection: %d (%v)", client_socket, client_endpoint)
+
+			client_arena: virtual.Arena
+			arena_allocator_error := virtual.arena_init_growing(&client_arena, 1 * mem.Kilobyte)
+			if arena_allocator_error != nil {
+				log.errorf("Error initializing client arena: %v", arena_allocator_error)
+
+				net.close(client_socket)
+				continue
+			}
+			client_allocator := virtual.arena_allocator(&client_arena)
+			client_data, client_data_allocator_error := new(ClientData, client_allocator)
+			if client_data_allocator_error != nil {
+				log.errorf("Error allocating client data: %v", client_data_allocator_error)
+
+				net.close(client_socket)
+				continue
+			}
+			client_data.endpoint = client_endpoint
+			client_data.socket = client_socket
+			thread.pool_add_task(&thread_pool, client_allocator, handle_client, client_data)
+		}
+		
 	fmt.println("done!")
+}
+
+handle_client :: proc(t: thread.Task) {
+	client_data := cast(^ClientData)t.data
+	context.logger = log.create_console_logger(ident = fmt.tprintf("%v", client_data.endpoint))
+	
+	log.debugf("Handling client: %v (%v)", client_data.endpoint, client_data)
+
+	for {
+		recv_buffer: [9]byte
+		message, done, receive_error := receive_message(client_data.socket, recv_buffer[:])
+		if receive_error != nil {
+			log.errorf("Error receiving message: %v", receive_error)
+
+			break
+		}
+		if done {
+			log.infof("Client disconnected: %v", client_data.endpoint)
+
+			break
+		}
+
+		send_buffer: [4]byte
+		outgoing_message := handle_message(message, send_buffer[:])
+		if outgoing_message != nil {
+			log.debugf("Sending message: %s (%d)", outgoing_message, transmute(i32be)send_buffer)
+			sent_bytes, send_error := net.send_tcp(client_data.socket, outgoing_message)
+			if send_error != nil {
+				log.errorf("Error sending message: %v", send_error)
+
+				break
+			}
+			if sent_bytes != len(outgoing_message) {
+				log.errorf(
+					"Error sending message: sent %d bytes, expected to send %d bytes",
+					sent_bytes,
+					len(outgoing_message),
+				)
+
+				break
+			}
+		}
+	}
+
+	net.close(client_data.socket)
+}
+
+receive_message :: proc(
+	socket: net.TCP_Socket,
+	buffer: []byte,
+) -> (
+	message: Message,
+	done: bool,
+	error: net.Network_Error,
+) {
+	bytes_received := 0
+	for bytes_received < len(buffer) {
+		n, recv_error := net.recv_tcp(socket, buffer[bytes_received:])
+		if recv_error == net.TCP_Recv_Error.Timeout {
+			bytes_received += n
+
+			continue
+		} else if recv_error != nil {
+			log.errorf("Error receiving message: %v", recv_error)
+
+			return nil, true, recv_error
+		}
+
+		bytes_received += n
+	}
+
+	return parse_message(buffer), done, nil
+}
+
+// TODO: serialize message
+parse_message :: proc(buffer: []byte) -> (message: Message) {
+	identifying_byte := buffer[0]
+	switch identifying_byte {
+	case 'J':
+		//timestamp_bytes := [4]byte{buffer[1], buffer[2], buffer[3], buffer[4]}
+		//timestamp := transmute(i32be)timestamp_bytes
+		//price_bytes := [4]byte{buffer[5], buffer[6], buffer[7], buffer[8]}
+		//price := transmute(i32be)price_bytes
+		message = Join {
+			player = "anon",
+			password = "123",
+		}
+
+	case 'C':
+		message = Command {
+			command = "foo",
+		}
+	}
+
+	return message
+}
+
+handle_message :: proc(
+	message: Message,
+	send_buffer: []byte,
+) -> (
+	outgoing_message: []byte,
+) {
+	switch m in message {
+	case Join:
+		fmt.println("Client joined:", m.player)
+		return nil
+	case Command:
+		return send_buffer
+	case Query:
+		return send_buffer
+	}
+
+	return nil
 }
