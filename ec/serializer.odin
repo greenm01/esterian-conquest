@@ -395,6 +395,9 @@ when SERIALIZER_ENABLE_GENERIC {
         serialize_message,
         serialize_report,
         serialize_planet_db,
+        serialize_login,
+        serialize_query,
+        serialize_command,
         
         // example
         serialize_foo,

@@ -12,28 +12,31 @@ import "core:mem/virtual"
 
 import "../ec"
 
+/* #### MESSAGE FORMAT ####
+
+Byte: |  0  | end  |
+Type: |char | data |
+
+The first byte of a message is a charavter indicating the type. This will
+be an ASCII uppercase:
+
+L = Login
+J = Join Game (new player)
+C = Command (fleet, planet, general orders, etc...)
+M = Message (send player message)
+
+The remaining bytes are serialized data that will be decoded based on the
+type of message.
+
+Insipred by:
+	https://github.com/GoNZooo/protohackers-stream/tree/main/means_to_an_end
+	https://protohackers.com/problem/2
+
+*/
+
 ClientData :: struct {
 	endpoint:  net.Endpoint,
 	socket:    net.TCP_Socket,
-}
-
-Message :: union {
-	Join,
-	Query,
-	Command,
-}
-
-Join :: struct {
-	player: string,
-	password: string,
-}
-
-Query :: struct {
-	query: string,
-}
-
-Command :: struct {
-	command: string,
 }
 
 init_server :: proc(config: ec.GameConfig, path: string) {
@@ -57,37 +60,37 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 	thread.pool_init(&thread_pool, context.allocator, 100)
 	thread.pool_start(&thread_pool)
 
-	game_data := load_game_data(path)
+	//game_data := load_game_data(path)
 	
 	for {
-			client_socket, client_endpoint, accept_error := net.accept_tcp(listen_socket)
-			if accept_error != nil {
-				log.errorf("Error accepting connection: %v", accept_error)
+		client_socket, client_endpoint, accept_error := net.accept_tcp(listen_socket)
+		if accept_error != nil {
+			log.errorf("Error accepting connection: %v", accept_error)
 
-				continue
-			}
-			log.debugf("Accepted connection: %d (%v)", client_socket, client_endpoint)
-
-			client_arena: virtual.Arena
-			arena_allocator_error := virtual.arena_init_growing(&client_arena, 1 * mem.Kilobyte)
-			if arena_allocator_error != nil {
-				log.errorf("Error initializing client arena: %v", arena_allocator_error)
-
-				net.close(client_socket)
-				continue
-			}
-			client_allocator := virtual.arena_allocator(&client_arena)
-			client_data, client_data_allocator_error := new(ClientData, client_allocator)
-			if client_data_allocator_error != nil {
-				log.errorf("Error allocating client data: %v", client_data_allocator_error)
-
-				net.close(client_socket)
-				continue
-			}
-			client_data.endpoint = client_endpoint
-			client_data.socket = client_socket
-			thread.pool_add_task(&thread_pool, client_allocator, handle_client, client_data)
+			continue
 		}
+		log.debugf("Accepted connection: %d (%v)", client_socket, client_endpoint)
+
+		client_arena: virtual.Arena
+		arena_allocator_error := virtual.arena_init_growing(&client_arena, 1 * mem.Kilobyte)
+		if arena_allocator_error != nil {
+			log.errorf("Error initializing client arena: %v", arena_allocator_error)
+
+			net.close(client_socket)
+			continue
+		}
+		client_allocator := virtual.arena_allocator(&client_arena)
+		client_data, client_data_allocator_error := new(ClientData, client_allocator)
+		if client_data_allocator_error != nil {
+			log.errorf("Error allocating client data: %v", client_data_allocator_error)
+
+			net.close(client_socket)
+			continue
+		}
+		client_data.endpoint = client_endpoint
+		client_data.socket = client_socket
+		thread.pool_add_task(&thread_pool, client_allocator, handle_client, client_data)
+	}
 		
 	fmt.println("done!")
 }
@@ -141,7 +144,7 @@ receive_message :: proc(
 	socket: net.TCP_Socket,
 	buffer: []byte,
 ) -> (
-	message: Message,
+	message: ec.ClientMessage,
 	done: bool,
 	error: net.Network_Error,
 ) {
@@ -150,11 +153,9 @@ receive_message :: proc(
 		n, recv_error := net.recv_tcp(socket, buffer[bytes_received:])
 		if recv_error == net.TCP_Recv_Error.Timeout {
 			bytes_received += n
-
 			continue
 		} else if recv_error != nil {
 			log.errorf("Error receiving message: %v", recv_error)
-
 			return nil, true, recv_error
 		}
 
@@ -164,22 +165,21 @@ receive_message :: proc(
 	return parse_message(buffer), done, nil
 }
 
-// TODO: serialize message
-parse_message :: proc(buffer: []byte) -> (message: Message) {
+/* Player sends login info, and if they're a new or unregistered player
+ * then we send them basic gamestate info to browse the game. Otherwise 
+ * we look up the player and send back their empire data.
+*/
+parse_message :: proc(buffer: []byte) -> (message: ec.ClientMessage) {
 	identifying_byte := buffer[0]
+	s: ec.Serializer
+	ec.serializer_init_reader(&s, buffer[1:])
 	switch identifying_byte {
-	case 'J':
-		//timestamp_bytes := [4]byte{buffer[1], buffer[2], buffer[3], buffer[4]}
-		//timestamp := transmute(i32be)timestamp_bytes
-		//price_bytes := [4]byte{buffer[5], buffer[6], buffer[7], buffer[8]}
-		//price := transmute(i32be)price_bytes
-		message = Join {
-			player = "anon",
-			password = "123",
-		}
-
+	case 'L':
+		login: ec.Login
+		ec.serialize(&s, &login)
+		message = login
 	case 'C':
-		message = Command {
+		message = ec.Command {
 			command = "foo",
 		}
 	}
@@ -188,18 +188,18 @@ parse_message :: proc(buffer: []byte) -> (message: Message) {
 }
 
 handle_message :: proc(
-	message: Message,
+	message: ec.ClientMessage,
 	send_buffer: []byte,
 ) -> (
 	outgoing_message: []byte,
 ) {
 	switch m in message {
-	case Join:
+	case ec.Login:
 		fmt.println("Client joined:", m.player)
 		return nil
-	case Command:
+	case ec.Command:
 		return send_buffer
-	case Query:
+	case ec.Query:
 		return send_buffer
 	}
 

@@ -9,7 +9,6 @@
     git 
     odin
     ols
-    enet
   ];
 
   # https://devenv.sh/scripts/
