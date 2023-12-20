@@ -12,15 +12,16 @@ main :: proc() {
 server_connect :: proc() {
 
 	endpoint := net.Endpoint {
-		address = net.IP4_Address([4]u8{0, 0, 0, 0}),
-		port    = 1992,
+		address = net.IP4_Address([4]u8{127, 0, 0, 1}),
+		port    = 10000,
 	}
 
-	dial_socket, ok := net.dial_tcp_from_endpoint(endpoint)
+	dial_socket, ok := net.dial_tcp(endpoint)
+	fmt.println(endpoint.address)
 	if ok != nil {
-		fmt.printf("Error listening on port %d: %v", endpoint.port, ok)
+		fmt.printf("error dialing port %d: %v", endpoint.port, ok)
 		os.exit(1)
 	}
-
-	log.infof("Listening on port %d", endpoint.port)
+		
+	log.infof("Connected to port %d", endpoint.port)
 }

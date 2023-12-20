@@ -43,7 +43,7 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 	fmt.print("starting game daemon...")
 	
 	endpoint := net.Endpoint {
-		address = net.IP4_Address([4]u8{0, 0, 0, 0}),
+		address = net.IP4_Address([4]u8{127, 0, 0, 1}),
 		port    = config.port,
 	}
 
@@ -70,7 +70,8 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 			continue
 		}
 		log.debugf("Accepted connection: %d (%v)", client_socket, client_endpoint)
-
+		fmt.println("accepted connection")
+		
 		client_arena: virtual.Arena
 		arena_allocator_error := virtual.arena_init_growing(&client_arena, 1 * mem.Kilobyte)
 		if arena_allocator_error != nil {
