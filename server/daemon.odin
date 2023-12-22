@@ -103,8 +103,7 @@ handle_client :: proc(t: thread.Task) {
 	log.debugf("Handling client: %v (%v)", client_data.endpoint, client_data)
 
 	for {
-		recv_buffer: [9]byte
-		message, done, receive_error := receive_message(client_data.socket, recv_buffer[:])
+		message, done, receive_error := receive_message(client_data.socket)
 		if receive_error != nil {
 			log.errorf("Error receiving message: %v", receive_error)
 
@@ -143,27 +142,28 @@ handle_client :: proc(t: thread.Task) {
 
 receive_message :: proc(
 	socket: net.TCP_Socket,
-	buffer: []byte,
 ) -> (
 	message: ec.ClientMessage,
 	done: bool,
 	error: net.Network_Error,
 ) {
-	bytes_received := 0
-	for bytes_received < len(buffer) {
-		n, recv_error := net.recv_tcp(socket, buffer[bytes_received:])
-		if recv_error == net.TCP_Recv_Error.Timeout {
-			bytes_received += n
-			continue
-		} else if recv_error != nil {
+	bytes: [dynamic]byte
+	for {
+		buffer: [16]byte
+		n, recv_error := net.recv_tcp(socket, buffer[:])
+		if recv_error == net.TCP_Recv_Error.Timeout do continue
+		else if recv_error != nil {
 			log.errorf("Error receiving message: %v", recv_error)
 			return nil, true, recv_error
 		}
-
-		bytes_received += n
+		append(&bytes,..buffer[:n])
+		// end of message
+		if buffer[n-1] == '\n' {
+			pop (&bytes)           // remove the newline   
+			break
+		}		
 	}
-
-	return parse_message(buffer), done, nil
+	return parse_message(bytes[:]), done, nil
 }
 
 /* Player sends login info, and if they're a new or unregistered player
@@ -178,6 +178,7 @@ parse_message :: proc(buffer: []byte) -> (message: ec.ClientMessage) {
 	case 'L':
 		login: ec.Login
 		ec.serialize(&s, &login)
+		fmt.println("hello", login.player, "pw =", login.password)
 		message = login
 	case 'C':
 		message = ec.Command {

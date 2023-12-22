@@ -5,6 +5,8 @@ import "core:fmt"
 import "core:log"
 import "core:net"
 
+import "../ec"
+
 main :: proc() {
 	server_connect()	
 }
@@ -24,4 +26,21 @@ server_connect :: proc() {
 	}
 		
 	log.infof("Connected to port %d", endpoint.port)
+
+	login := ec.Login {
+		"mason",
+		"foobar",
+	}
+
+	s: ec.Serializer
+	ec.serializer_init_writer(&s)
+	ec.serialize(&s, &login)
+
+	m := [dynamic]byte{'L'}
+	append(&m, ..s.data[:])
+	append(&m, '\n')
+	fmt.println(m)
+	net.send(dial_socket, m[:])
+
+	
 }
