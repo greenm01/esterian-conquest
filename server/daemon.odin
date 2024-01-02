@@ -40,7 +40,9 @@ ClientData :: struct {
 }
 
 init_server :: proc(config: ec.GameConfig, path: string) {
-	fmt.print("starting game daemon...")
+
+	//method := ssl.server_method()			
+	//fmt.print("starting game daemon...")
 	
 	endpoint := net.Endpoint {
 		address = net.IP4_Address([4]u8{127, 0, 0, 1}),
@@ -50,7 +52,6 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 	listen_socket, ok := net.listen_tcp(endpoint)
 	if ok != nil {
 		fmt.printf("Error listening on port %d: %v", config.port, ok)
-
 		os.exit(1)
 	}
 
@@ -66,7 +67,6 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 		client_socket, client_endpoint, accept_error := net.accept_tcp(listen_socket)
 		if accept_error != nil {
 			log.errorf("Error accepting connection: %v", accept_error)
-
 			continue
 		}
 		log.debugf("Accepted connection: %d (%v)", client_socket, client_endpoint)
@@ -76,7 +76,6 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 		arena_allocator_error := virtual.arena_init_growing(&client_arena, 1 * mem.Kilobyte)
 		if arena_allocator_error != nil {
 			log.errorf("Error initializing client arena: %v", arena_allocator_error)
-
 			net.close(client_socket)
 			continue
 		}
@@ -84,7 +83,6 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 		client_data, client_data_allocator_error := new(ClientData, client_allocator)
 		if client_data_allocator_error != nil {
 			log.errorf("Error allocating client data: %v", client_data_allocator_error)
-
 			net.close(client_socket)
 			continue
 		}
@@ -106,12 +104,10 @@ handle_client :: proc(t: thread.Task) {
 		message, done, receive_error := receive_message(client_data.socket)
 		if receive_error != nil {
 			log.errorf("Error receiving message: %v", receive_error)
-
 			break
 		}
 		if done {
 			log.infof("Client disconnected: %v", client_data.endpoint)
-
 			break
 		}
 
@@ -122,7 +118,6 @@ handle_client :: proc(t: thread.Task) {
 			sent_bytes, send_error := net.send_tcp(client_data.socket, outgoing_message)
 			if send_error != nil {
 				log.errorf("Error sending message: %v", send_error)
-
 				break
 			}
 			if sent_bytes != len(outgoing_message) {
@@ -131,7 +126,6 @@ handle_client :: proc(t: thread.Task) {
 					sent_bytes,
 					len(outgoing_message),
 				)
-
 				break
 			}
 		}
@@ -151,6 +145,7 @@ receive_message :: proc(
 	for {
 		buffer: [16]byte
 		n, recv_error := net.recv_tcp(socket, buffer[:])
+		if n == 0 do return nil, true, nil
 		if recv_error == net.TCP_Recv_Error.Timeout do continue
 		else if recv_error != nil {
 			log.errorf("Error receiving message: %v", recv_error)

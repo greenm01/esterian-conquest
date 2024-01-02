@@ -19,14 +19,14 @@ server_connect :: proc() {
 	}
 
 	dial_socket, ok := net.dial_tcp(endpoint)
-	fmt.println(endpoint.address)
 	if ok != nil {
 		fmt.printf("error dialing port %d: %v", endpoint.port, ok)
 		os.exit(1)
 	}
 		
 	log.infof("Connected to port %d", endpoint.port)
-
+	fmt.println("Connected to port %d", endpoint.port)
+	
 	login := ec.Login {
 		"mason",
 		"foobar",

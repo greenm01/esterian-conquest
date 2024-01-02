@@ -6,9 +6,11 @@
 
   # https://devenv.sh/packages/
   packages = with pkgs; [
-    git 
-    odin
     ols
+    llvmPackages_17.bintools
+    llvmPackages_17.llvm
+    llvmPackages_17.clang
+    lld_17
   ];
 
   # https://devenv.sh/scripts/
