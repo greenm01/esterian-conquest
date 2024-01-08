@@ -6,6 +6,7 @@ import "core:log"
 import "core:net"
 
 import "../ec"
+import "ui"
 
 main :: proc() {
 	server_connect()	
@@ -25,7 +26,7 @@ server_connect :: proc() {
 	}
 		
 	log.infof("Connected to port %d", endpoint.port)
-	fmt.println("Connected to port %d", endpoint.port)
+	fmt.println("Connected to port", endpoint.port)
 	
 	login := ec.Login {
 		"mason",
@@ -42,5 +43,13 @@ server_connect :: proc() {
 	fmt.println(m)
 	net.send(dial_socket, m[:])
 
-	
+	fmt.println("Init")
+	ui.init()
+
+	//w,h := ui.terminal_dimensions()
+	//fmt.println("Width", w, "Height", h)
+			
+	//ui.clear()
+	ui.close()
+	fmt.println("close")	
 }
