@@ -4,7 +4,8 @@
 
 package ui
 
-import 	"core:strings"
+import "core:strings"
+import "core:unicode/utf8"
 
 TOKEN_FG :: "fg"
 TOKEN_BG :: "bg"
@@ -30,7 +31,7 @@ parser_color_map := map[string]Color{
 	"cyan" =    CYAN,
 	"yellow" =  YELLOW,
 	"white" =   WHITE,
-	"clear" =   CLEAR,
+	"clear" =   COLOR_CLEAR,
 	"green" =   GREEN,
 	"magenta" = MAGENTA,
 }
@@ -44,7 +45,8 @@ modifier_map := map[string]Modifier{
 // readStyle translates an []rune like `fg:red,mod:bold,bg:white` to a style
 read_style :: proc(runes: []rune, default_style: Style) -> Style {
 	style := default_style
-	split := strings.split(string(runes), TOKEN_ITEM_SEPERATOR)
+	s := utf8.runes_to_string(runes)
+	split := strings.split(s, TOKEN_ITEM_SEPERATOR)
 	for item, _ in split {
 		pair := strings.split(item, TOKEN_VALUE_SEPERATOR)
 		if len(pair) == 2 {
@@ -65,83 +67,103 @@ read_style :: proc(runes: []rune, default_style: Style) -> Style {
 // Uses defaultStyle for any text without an embedded style.
 // Syntax is of the form [text](fg:<color>,mod:<attribute>,bg:<color>).
 // Ordering does not matter. All fields are optional.
-func ParseStyles(s string, defaultStyle Style) []Cell {
-	cells := []Cell{}
-	runes := []rune(s)
-	state := parserStateDefault
-	styledText := []rune{}
-	styleItems := []rune{}
-	squareCount := 0
+parse_styles :: proc(s: string, default_style: Style) -> []Cell {
 
-	reset := func() {
-		styledText = []rune{}
-		styleItems = []rune{}
-		state = parserStateDefault
-		squareCount = 0
+	Parser :: struct {
+		cells: [dynamic]Cell,
+		runes: []rune,
+		state: Parser_State, 
+		styled_text: [dynamic]rune,
+		style_items: [dynamic]rune,
+		square_count: int,
 	}
 
-	rollback := func() {
-		cells = append(cells, RunesToStyledCells(styledText, defaultStyle)...)
-		cells = append(cells, RunesToStyledCells(styleItems, defaultStyle)...)
-		reset()
+	del_parser :: proc(p: ^Parser){
+			delete(p.cells)
+			delete(p.styled_text)
+			delete(p.style_items)	
+	}	
+		
+	p := Parser {
+		make([dynamic]Cell),
+		utf8.string_to_runes(s),
+		PARSER_STATE_DEFAULT,
+		make([dynamic]rune),
+		make([dynamic]rune),
+		0,
 	}
+	defer del_parser(&p)
 
+	reset :: proc(p: ^Parser) {
+			clear_dynamic_array(&p.styled_text)
+			clear_dynamic_array(&p.style_items)
+			p.state = PARSER_STATE_DEFAULT
+			p.square_count = 0
+	}	
+	
+	rollback :: proc(p: ^Parser, default_style: Style) {
+		append(&p.cells, ..runes_to_styled_cells(p.styled_text[:], default_style))
+		append(&p.cells, ..runes_to_styled_cells(p.style_items[:], default_style))
+		reset(p)
+	}
+	
 	// chop first and last runes
-	chop := func(s []rune) []rune {
+	chop :: proc(s: []rune) -> []rune {
 		return s[1 : len(s)-1]
 	}
 
-	for i, _rune := range runes {
-		switch state {
-		case parserStateDefault:
-			if _rune == tokenBeginStyledText {
-				state = parserStateStyledText
-				squareCount = 1
-				styledText = append(styledText, _rune)
+	for _rune, i in p.runes {
+		switch p.state {
+		case PARSER_STATE_DEFAULT:
+			if _rune == TOKEN_BEGIN_STYLED_TEXT {
+				p.state = PARSER_STATE_STYLE_TEXT
+				p.square_count = 1
+				append(&p.styled_text, _rune)
 			} else {
-				cells = append(cells, Cell{_rune, defaultStyle})
+				append(&p.cells, Cell{_rune, default_style})
 			}
-		case parserStateStyledText:
+		case PARSER_STATE_STYLE_TEXT:
 			switch {
-			case squareCount == 0:
+			case p.square_count == 0:
 				switch _rune {
-				case tokenBeginStyle:
-					state = parserStateStyleItems
-					styleItems = append(styleItems, _rune)
-				default:
-					rollback()
+				case TOKEN_BEGIN_STYLE:
+					p.state = PARSER_STATE_STYLE_ITEMS
+					append(&p.style_items, _rune)
+				case:
+					rollback(&p, default_style)
 					switch _rune {
-					case tokenBeginStyledText:
-						state = parserStateStyledText
-						squareCount = 1
-						styleItems = append(styleItems, _rune)
-					default:
-						cells = append(cells, Cell{_rune, defaultStyle})
+					case TOKEN_BEGIN_STYLED_TEXT:
+						p.state = PARSER_STATE_STYLE_TEXT
+						p.square_count = 1
+						append(&p.style_items, _rune)
+					case:
+						append(&p.cells, Cell{_rune, default_style})
 					}
 				}
-			case len(runes) == i+1:
-				rollback()
-				styledText = append(styledText, _rune)
-			case _rune == tokenBeginStyledText:
-				squareCount++
-				styledText = append(styledText, _rune)
-			case _rune == tokenEndStyledText:
-				squareCount--
-				styledText = append(styledText, _rune)
-			default:
-				styledText = append(styledText, _rune)
+			case len(p.runes) == i+1:
+				rollback(&p, default_style)
+				append(&p.styled_text, _rune)
+			case _rune == TOKEN_BEGIN_STYLED_TEXT:
+				p.square_count+=1
+				append(&p.styled_text, _rune)
+			case _rune == TOKEN_END_STYLED_TEXT:
+				p.square_count-=1
+				append(&p.styled_text, _rune)
+			case:
+				append(&p.styled_text, _rune)
 			}
-		case parserStateStyleItems:
-			styleItems = append(styleItems, _rune)
-			if _rune == tokenEndStyle {
-				style := readStyle(chop(styleItems), defaultStyle)
-				cells = append(cells, RunesToStyledCells(chop(styledText), style)...)
-				reset()
-			} else if len(runes) == i+1 {
-				rollback()
+		case PARSER_STATE_STYLE_ITEMS:
+			append(&p.style_items, _rune)
+			if _rune == TOKEN_END_STYLE {
+				style := read_style(chop(p.style_items[:]), default_style)
+				append(&p.cells, ..runes_to_styled_cells(chop(p.styled_text[:]), style))
+				reset(&p)
+			} else if len(p.runes) == i+1 {
+				rollback(&p, default_style)
 			}
 		}
 	}
 
-	return cells
+	return p.cells[:]
+
 }

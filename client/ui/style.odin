@@ -34,7 +34,7 @@ Style :: struct {
 }
 
 // StyleClear represents a default Style, with no colors or modifiers
-STYLE_CLEAR :: Style { ColorClear, ColorClear, ModifierClear }
+STYLE_CLEAR :: Style { COLOR_CLEAR, COLOR_CLEAR, MOD_CLEAR }
 
 // NewStyle returns a new style
 new_style :: proc(fg: Color, bg := COLOR_CLEAR, modifier := MOD_CLEAR) -> Style {
