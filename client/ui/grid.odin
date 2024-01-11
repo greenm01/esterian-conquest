@@ -27,12 +27,13 @@ Grid_Item :: struct {
 	ratio:        f64,
 }
 
-new_grid :: proc() -> ^Grid {
-	g := &Grid{	block = ^new_block() }
+new_grid :: proc() -> Grid {
+	b := new_block()
+	g := Grid{block = b}
 	g.border = false
 	return g
 }
-
+/*
 // NewCol takes a height percentage and either a widget or a Row or Column
 new_col :: proc(ratio: f64, i: ..interface{}) -> Grid_Item {
 	_, ok := i[0].(Drawable)
@@ -122,7 +123,7 @@ set_helper :: proc(g: ^Grid, item: Grid_Item, parentWidthRatio, parentHeightRati
 	}
 }
 
-draw :: proc(g: ^Grid, buf: ^Buffer) {
+draw_grid :: proc(g: ^Grid, buf: ^Buffer) {
 	width := f64(g.dx()) + 1
 	height := f64(g.dy()) + 1
 
@@ -144,3 +145,4 @@ draw :: proc(g: ^Grid, buf: ^Buffer) {
 		unlock(entry)
 	}
 }
+*/

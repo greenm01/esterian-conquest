@@ -4,43 +4,16 @@
 
 package ui
 
-/*
-import (
-	"image"
-	"sync"
-
-	tb "github.com/nsf/termbox-go"
-)
-
-type Drawable interface {
-	GetRect() image.Rectangle
-	SetRect(int, int, int, int)
-	Draw(*Buffer)
-	sync.Locker
-}
-*/
-
-// explicit procedure overloading
-
 draw :: proc {
 	draw_block,
+	draw_paragraph,
 }
 
-get_rect :: proc {
-	get_rect_block,
-}
-
-set_rect :: proc {
-	set_rect_block,
-}
-
-// need parametric polymorphism? line 629 in demo
-render :: proc(items: ..Drawable) {
-	for item, _ in items {
-		buf := new_buffer(get_rect(item))
-		//item.Lock()
+render :: proc(items: ..$T) {
+	for item in items {
+		buf := new_buffer(get_rect(item.block))
 		draw(item, buf)
-		//item.Unlock()
+		/*		
 		for cell, point in buf.cell_map {
 			if point.in(buf.rectangle) {
 				tb.set_cell(
@@ -49,7 +22,7 @@ render :: proc(items: ..Drawable) {
 					tb.Attribute(cell.Style.Fg+1)|tb.Attribute(cell.Style.Modifier), tb.Attribute(cell.Style.Bg+1),
 				)
 			}
-		}
+		}*/
 	}
-	tb.flush()
+	//tb.flush()
 }

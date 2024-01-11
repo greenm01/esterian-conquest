@@ -13,15 +13,16 @@ Block :: struct {
 	border_style: Style,
 	border_left, border_right, border_top, border_bottom: bool,
 	padding_left, padding_right, padding_top, padding_bottom: int,
-	rectangle: Rectangle,
+	using rectangle: Rectangle,
 	inner: Rectangle,
 	title: string,
 	title_style: Style,
-	//sync.Mutex
+
+	derived: any
 }
 
-new_block :: proc() -> ^Block {
-	return &Block{
+new_block :: proc() -> Block {
+	return Block{
 		border = true,
 		border_style = theme.block.border,
 		border_left = true,
@@ -38,16 +39,16 @@ draw_border :: proc(b: Block, buf: ^Buffer) {
 
 	// draw lines
 	if b.border_top {
-		fill(buf, horizontal_cell, Rectangle{b.min.x, b.min.y, b.max.x, b.min.y+1})
+		fill(buf, horizontal_cell, rect(b.min.x, b.min.y, b.max.x, b.min.y+1))
 	}
 	if b.border_bottom {
-		fill(buf, horizontal_cell, Rectangle{b.min.x, b.max.y-1, b.max.x, b.max.y})
+		fill(buf, horizontal_cell, rect(b.min.x, b.max.y-1, b.max.x, b.max.y))
 	}
 	if b.border_left {
-		fill(buf, vertical_cell, Rectangle{b.min.x, b.min.y, b.min.x+1, b.max.y})
+		fill(buf, vertical_cell, rect(b.min.x, b.min.y, b.min.x+1, b.max.y))
 	}
 	if b.border_right {
-		fill(buf, vertical_cell, Rectangle{b.max.x-1, b.min.y, b.max.x, b.max.y})
+		fill(buf, vertical_cell, rect(b.max.x-1, b.min.y, b.max.x, b.max.y))
 	}
 
 	// draw corners
@@ -55,13 +56,13 @@ draw_border :: proc(b: Block, buf: ^Buffer) {
 		set_cell(buf, Cell{TOP_LEFT, b.border_style}, b.min)
 	}
 	if b.border_top && b.border_right {
-		set_cell(buf, Cell{TOP_RIGHT, b.border_style}, image.Pt(b.max.x-1, b.min.y))
+		set_cell(buf, Cell{TOP_RIGHT, b.border_style}, pt(b.max.x-1, b.min.y))
 	}
 	if b.border_bottom && b.border_left {
-		set_cell(buf, Cell{BOTTOM_LEFT, b.border_style}, image.Pt(b.min.x, b.max.y-1))
+		set_cell(buf, Cell{BOTTOM_LEFT, b.border_style}, pt(b.min.x, b.max.y-1))
 	}
 	if b.border_bottom && b.border_right {
-		set_cell(buf, Cell{BOTTOM_RIGHT, b.border_style}, b.max.Sub(image.Pt(1, 1)))
+		set_cell(buf, Cell{BOTTOM_RIGHT, b.border_style}, pt_sub(b.max, pt(1, 1)))
 	}
 }
 
@@ -77,17 +78,17 @@ draw_block :: proc(b: Block, buf: ^Buffer) {
 }
 
 // SetRect implements the Drawable interface.
-set_rect_block :: proc(b: ^Block, x1, y1, x2, y2: int) {
-	b.rectangle = Rectangle{ x1, y1, x2, y2 }
-	b.inner = Rectangle{
+set_rect :: proc(b: ^Block, x1, y1, x2, y2: int) {
+	b.rectangle = rect(x1, y1, x2, y2)
+	b.inner = rect(
 		b.min.x+1+b.padding_left,
 		b.min.y+1+b.padding_top,
 		b.max.x-1-b.padding_right,
 		b.max.y-1-b.padding_bottom,
-	}
+	)
 }
 
 // GetRect implements the Drawable interface.
-get_rect_block :: proc(b: Block) -> Rectangle {
+get_rect :: proc(b: Block) -> Rectangle {
 	return b.rectangle
 }

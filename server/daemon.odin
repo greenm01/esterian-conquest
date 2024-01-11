@@ -90,7 +90,6 @@ init_server :: proc(config: ec.GameConfig, path: string) {
 		client_data.socket = client_socket
 		thread.pool_add_task(&thread_pool, client_allocator, handle_client, client_data)
 	}
-		
 	fmt.println("done!")
 }
 

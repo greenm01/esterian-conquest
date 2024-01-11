@@ -4,6 +4,11 @@
 
 package ui
 
+import "core:bytes"
+import "core:io"
+import "core:strings"
+import "core:unicode/utf8"
+
 /*
 import (
 	"fmt"
@@ -152,45 +157,47 @@ func MinInt(x, y int) int {
 	return y
 }
 
+*/
+
 // []Cell ----------------------------------------------------------------------
 
 // WrapCells takes []Cell and inserts Cells containing '\n' wherever a linebreak should go.
-func WrapCells(cells []Cell, width uint) []Cell {
-	str := CellsToString(cells)
-	wrapped := wordwrap.WrapString(str, width)
-	wrappedCells := []Cell{}
+wrap_cells :: proc(cells: []Cell, width: uint) -> []Cell {
+	str := cells_to_string(cells)
+	wrapped := wrap_string(str, width)
+	wrapped_cells := []Cell{}
 	i := 0
-	for _, _rune := range wrapped {
+	for _rune in wrapped {
 		if _rune == '\n' {
-			wrappedCells = append(wrappedCells, Cell{_rune, StyleClear})
+			wrapped_cells = append(wrapped_cells, Cell{_rune, StyleClear})
 		} else {
-			wrappedCells = append(wrappedCells, Cell{_rune, cells[i].Style})
+			wrapped_cells = append(wrapped_cells, Cell{_rune, cells[i].Style})
 		}
-		i++
+		i += 1
 	}
-	return wrappedCells
+	return wrapped_cells
 }
-*/
 
 runes_to_styled_cells :: proc(runes: []rune, style: Style) -> []Cell {
-	cells: [dynamic]Cell
-	for _rune,_ in runes {
-		append(&cells, Cell{_rune, style})
+	cells := make([]Cell,len(runes))
+	for r, i in runes {
+		cells[i] = Cell{r, style}
 	}
-	return cells[:]
+	return cells
+}
+
+cells_to_string :: proc(cells: []Cell) -> string {
+	runes := make([]rune, len(cells))
+	defer delete(runes)
+	for cell, i in cells {
+		runes[i] = cell._rune
+	}
+	return utf8.runes_to_string(runes)
 }
 
 /*
-func CellsToString(cells []Cell) string {
-	runes := make([]rune, len(cells))
-	for i, cell := range cells {
-		runes[i] = cell.Rune
-	}
-	return string(runes)
-}
-
 func TrimCells(cells []Cell, w int) []Cell {
-	s := CellsToString(cells)
+	s := cells_to_string(cells)
 	s = TrimString(s, w)
 	runes := []rune(s)
 	newCells := []Cell{}
@@ -217,18 +224,96 @@ func SplitCells(cells []Cell, r rune) [][]Cell {
 	return splitCells
 }
 
-type CellWithX struct {
-	X    int
-	Cell Cell
+*/
+
+Cell_With_X :: struct {
+	x: int,
+	cell: Cell,
 }
 
-func BuildCellWithXArray(cells []Cell) []CellWithX {
-	cellWithXArray := make([]CellWithX, len(cells))
+build_cell_with_xarray :: proc(cells: []Cell) -> []Cell_With_X {
+	cell_with_xarray := make([]Cell_With_X, len(cells))
 	index := 0
-	for i, cell := range cells {
-		cellWithXArray[i] = CellWithX{X: index, Cell: cell}
-		index += rw.RuneWidth(cell.Rune)
+	for cell, i in cells {
+		cell_with_xarray[i] = Cell_With_X{index, cell}
+		index += utf8.rune_size(cell._rune)
 	}
-	return cellWithXArray
+	return cell_with_xarray
 }
-*/
+
+NBSP :: 0xA0
+
+// ported from https://github.com/mitchellh/go-wordwrap
+// WrapString wraps the given string within lim width in characters.
+// Wrapping is currently naive and only happens at white-space. A future
+// version of the library will implement smarter wrapping. This means that
+// pathological cases can dramatically reach past the limit, such as a very
+// long word.
+wrap_string :: proc(s: string, lim: uint) -> string {
+	// Initialize a buffer with a slightly larger size to account for breaks
+	stream: io.Stream
+
+	current: uint
+	word_buf, space_buf: ^bytes.Buffer
+	word_buf_len, space_buf_len: uint
+
+	for char in s {
+		if char == '\n' {
+			if bytes.buffer_length(word_buf) == 0 {
+				if current+space_buf_len > lim {
+					current = 0
+				} else {
+					current += space_buf_len
+					bytes.buffer_write_to(space_buf, stream)
+				}
+				bytes.buffer_reset(space_buf)
+				space_buf_len = 0
+			} else {
+				current += space_buf_len + word_buf_len
+				bytes.buffer_write_to(space_buf, stream)
+				bytes.buffer_reset(space_buf)
+				space_buf_len = 0
+				bytes.buffer_write_to(word_buf, stream)
+				bytes.buffer_reset(word_buf)
+				word_buf_len = 0
+			}
+			io.write_rune(stream, char)
+			current = 0
+		} else if strings.is_space(char) && char != NBSP {
+			if bytes.buffer_length(space_buf) == 0 || bytes.buffer_length(word_buf) > 0 {
+				current += space_buf_len + word_buf_len
+				bytes.buffer_write_to(space_buf, stream)
+				bytes.buffer_reset(space_buf)
+				space_buf_len = 0
+				bytes.buffer_write_to(word_buf, stream)
+				bytes.buffer_reset(word_buf)
+				word_buf_len = 0
+			}
+			bytes.buffer_write_rune(space_buf, char)
+			space_buf_len += 1
+		} else {
+			bytes.buffer_write_rune(word_buf, char)
+			word_buf_len += 1
+
+			if current+word_buf_len+space_buf_len > lim && word_buf_len < lim {
+				io.write_rune(stream, '\n')
+				current = 0
+				bytes.buffer_reset(space_buf)
+				space_buf_len = 0
+			}
+		}
+	}
+
+	if bytes.buffer_length(word_buf) == 0 {
+		if current+space_buf_len <= lim {
+			bytes.buffer_write_to(space_buf, stream)
+		}
+	} else {
+		bytes.buffer_write_to(space_buf, stream)
+		bytes.buffer_write_to(word_buf, stream)
+	}
+
+	buf := new(bytes.Buffer)
+	bytes.buffer_read_from(buf, stream)
+	return bytes.buffer_to_string(buf)
+}

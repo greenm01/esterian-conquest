@@ -7,17 +7,17 @@ import "core:unicode/utf8"
 
 // Cell represents a viewable terminal cell
 Cell :: struct {
-	r:  rune,
+	_rune: rune,   
 	style: Style,
 }
 
-CELL_CLEAR :: Cell{ ' ', STYLE_CLEAR}
+CELL_CLEAR :: Cell{' ', STYLE_CLEAR}
 
 // NewCell takes 1 to 2 arguments
 // 1st argument = rune
 // 2nd argument = optional style
 new_cell :: proc(r: rune, style := STYLE_CLEAR) -> Cell {
-	return Cell{ r, style }
+	return Cell{r, style}
 }
 
 // Buffer represents a section of a terminal and is a renderable rectangle of cells.
@@ -27,7 +27,7 @@ Buffer :: struct {
 }
 
 new_buffer :: proc(r: Rectangle) -> ^Buffer {
-	buf := Buffer{ r, make(map[Point]Cell)	}
+	buf := Buffer{r, make(map[Point]Cell)}
 	fill(&buf, CELL_CLEAR, r) // clears out area
 	return &buf
 }
@@ -43,7 +43,7 @@ set_cell :: proc(b: ^Buffer, c: Cell, p: Point) {
 fill :: proc(b: ^Buffer, c: Cell, rect: Rectangle) {
 	for x := rect.min.x; x < rect.max.x; x+=1 {
 		for y := rect.min.y; y < rect.max.y; y+=1 {
-			set_cell(b, c, Point{ x, y })
+			set_cell(b, c, Point{x, y})
 		}
 	}
 }
