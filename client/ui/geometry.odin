@@ -25,3 +25,11 @@ rect :: proc(x0, y0, x1, y1: int) -> Rectangle {
  p2 := Point{x1,y1}
  return Rectangle{p1,p2}
 }
+
+dx :: proc(r: Rectangle) -> int {
+ return r.max.x - r.min.x
+}
+
+dy :: proc(r: Rectangle) -> int {
+ return r.max.y - r.min.y
+}

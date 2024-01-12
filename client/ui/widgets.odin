@@ -36,7 +36,7 @@ draw_paragraph :: proc(p: Paragraph, buf: ^Buffer) {
 
 	cells := parse_styles(p.text, p.text_style)
 	if p.wrap_text {
-		cells = wrap_cells(cells, uint(p.inner.dx()))
+		cells = wrap_cells(cells, uint(dx(p.inner)))
 	}
 
 	rows := split_cells(cells, '\n')
@@ -45,10 +45,10 @@ draw_paragraph :: proc(p: Paragraph, buf: ^Buffer) {
 		if y+p.inner.min.y >= p.inner.max.y {
 			break
 		}
-		row = trim_cells(row, p.inner.dx())
+		rows[y] = trim_cells(row, dx(p.inner))
 		for cx, _ in build_cell_with_xarray(row) {
 			x, cell := cx.x, cx.cell
-			buf.set_cell(cell, pt_add(pt(x, y), p.inner.min))
+			set_cell(buf, cell, pt_add(pt(x, y), p.inner.min))
 		}
 	}
 }
