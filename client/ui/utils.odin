@@ -4,17 +4,17 @@
 
 package ui
 
-import "core:strings"
-import "core:unicode/utf8"
+import "core:fmt"
 import "core:math"
 import "core:os"
-import "core:fmt"
+import "core:strings"
+import "core:unicode/utf8"
 
 import "wordwrap"
 
 string_width :: proc(s: string) -> int {
 	runes := utf8.string_to_runes(s)
-	len: int 
+	len: int
 	for r in runes {
 		len += utf8.rune_size(r)
 	}
@@ -31,11 +31,11 @@ trim_string :: proc(s: string, w: int) -> string {
 }
 
 select_color :: proc(colors: []Color, index: int) -> Color {
-	return colors[index%len(colors)]
+	return colors[index % len(colors)]
 }
 
 select_style :: proc(styles: []Style, index: int) -> Style {
-	return styles[index%len(styles)]
+	return styles[index % len(styles)]
 }
 
 // Math ------------------------------------------------------------------------
@@ -119,7 +119,7 @@ min_f64 :: proc(x, y: f64) -> f64 {
 }
 
 max_f64 :: proc(x, y: f64) -> f64 {
-	if x > y do	return x
+	if x > y do return x
 	return y
 }
 
@@ -129,7 +129,7 @@ max_int :: proc(x, y: int) -> int {
 }
 
 min_int :: proc(x, y: int) -> int {
-	if x < y do	return x
+	if x < y do return x
 	return y
 }
 
@@ -151,7 +151,7 @@ wrap_cells :: proc(cells: []Cell, width: uint) -> []Cell {
 }
 
 runes_to_styled_cells :: proc(runes: []rune, style: Style) -> []Cell {
-	cells := make([]Cell,len(runes))
+	cells := make([]Cell, len(runes))
 	for r, i in runes {
 		cells[i] = Cell{r, style}
 	}
@@ -180,26 +180,26 @@ trim_cells :: proc(cells: []Cell, w: int) -> []Cell {
 }
 
 split_cells :: proc(cells: []Cell, r: rune) -> [][]Cell {
-	split_cells: [dynamic][dynamic]Cell
-	defer delete(split_cells)
+	left: [dynamic]Cell
+	defer delete(left)
 	temp: [dynamic]Cell
 	defer delete(temp)
 	for cell in cells {
 		if cell._rune == r {
-			append(&split_cells, temp)
+			append(&left, ..temp[:])
 			clear_dynamic_array(&temp)
 		} else {
 			append(&temp, cell)
 		}
 	}
-	if len(temp) > 0 {
-		append(&split_cells, temp)
-	}
-	return split_cells[:][:]
+
+	split_cells := [][]Cell{left[:], temp[:]}
+
+	return split_cells
 }
 
 Cell_With_X :: struct {
-	x: int,
+	x:    int,
 	cell: Cell,
 }
 
